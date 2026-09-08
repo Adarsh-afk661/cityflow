@@ -2,12 +2,6 @@ import React from 'react';
 import {
   X,
   Sparkles,
-  ShieldCheck,
-  ShieldAlert,
-  Clock,
-  Leaf,
-  AlertTriangle,
-  TrendingDown,
   ArrowRight,
   CheckCircle2,
   SlidersHorizontal,
@@ -53,8 +47,6 @@ export const RouteExplanationPanel: React.FC<RouteExplanationPanelProps> = ({
     routingMode,
     scenarios
   );
-
-  const isFailed = route.clearanceStatus === 'failed';
 
   const handleApplyRoute = () => {
     setSelectedRoute(route);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RotateCcw, Check, Database, RefreshCw, CheckCircle2, Cpu, BarChart3, TrendingUp, Layers } from 'lucide-react';
+import { RotateCcw, Check, Database, RefreshCw, CheckCircle2, Cpu } from 'lucide-react';
 import { VehicleProfileManager } from '../components/settings/VehicleProfileManager';
 import { useCityFlow } from '../context/CityFlowContext';
 import { RoutingMode } from '../types';

@@ -7,7 +7,7 @@ let isConnected = false;
 let currentUri = '';
 
 export const connectDB = async (customUri?: string): Promise<boolean> => {
-  const uri = customUri || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/cityflow';
+  const uri = customUri || process.env.MONGODB_URI || 'mongodb+srv://adarshsrivastava77051_db_user:cSOLKxxGFcq5kKDt@cluster0.37p14qy.mongodb.net/cityflow?retryWrites=true&w=majority&appName=Cluster0';
   currentUri = uri;
 
   try {

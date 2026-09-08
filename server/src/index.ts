@@ -7,7 +7,7 @@ import { router as apiRouter } from './routes/api.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 5000;
 
 app.use(cors());
 app.use(express.json());
@@ -27,9 +27,9 @@ app.get('/', (req, res) => {
 // Initialize MongoDB & start listening
 const startServer = async () => {
   await connectDB();
-  app.listen(PORT, () => {
-    console.log(`[CityFlow Server] Running on port ${PORT}`);
-    console.log(`[CityFlow Server] API Health: http://localhost:${PORT}/api/health`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`[CityFlow Server] Running on http://0.0.0.0:${PORT}`);
+    console.log(`[CityFlow Server] API Health: http://0.0.0.0:${PORT}/api/health`);
   });
 };
 

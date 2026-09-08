@@ -1,11 +1,13 @@
-import React from 'react';
-import { ShieldCheck, ArrowRight, CheckCircle2, Zap, Navigation } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShieldCheck, ArrowRight, CheckCircle2, Zap, Navigation, Sparkles } from 'lucide-react';
 import { useSimulation } from '../../context/SimulationContext';
 import { useCityFlow } from '../../context/CityFlowContext';
+import { RouteExplanationPanel } from '../routeshield/RouteExplanationPanel';
 
 export const ContingencyCard: React.FC = () => {
   const { simulationResult } = useSimulation();
   const { setSelectedRoute, setActivePage } = useCityFlow();
+  const [explainOpen, setExplainOpen] = useState(false);
 
   if (!simulationResult) return null;
 
@@ -17,36 +19,49 @@ export const ContingencyCard: React.FC = () => {
   };
 
   return (
-    <div className="bg-[#ecfdf5] border border-emerald-300 rounded-2xl p-6 shadow-sm text-left">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 mb-4 border-b border-emerald-200/80">
-        <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 rounded-xl bg-white border border-emerald-300 flex items-center justify-center text-[#166534] shadow-sm">
-            <ShieldCheck className="w-7 h-7" />
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-[#166534]">
-                OPTIMAL CONTINGENCY IDENTIFIED
-              </span>
+    <>
+      <div className="bg-[#ecfdf5] border border-emerald-300 rounded-2xl p-6 shadow-sm text-left">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 mb-4 border-b border-emerald-200/80">
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 rounded-xl bg-white border border-emerald-300 flex items-center justify-center text-[#166534] shadow-sm">
+              <ShieldCheck className="w-7 h-7" />
             </div>
-            <h3 className="text-xl font-extrabold text-slate-900 mt-1">
-              Recommended: {contingencyRoute.name}
-            </h3>
-            <p className="text-xs text-slate-600 font-medium mt-0.5">
-              {contingencyMessage}
-            </p>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-[#166534]">
+                  OPTIMAL CONTINGENCY IDENTIFIED
+                </span>
+              </div>
+              <h3 className="text-xl font-extrabold text-slate-900 mt-1">
+                Recommended: {contingencyRoute.name}
+              </h3>
+              <p className="text-xs text-slate-600 font-medium mt-0.5">
+                {contingencyMessage}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <button
+              id="why-contingency-btn"
+              type="button"
+              onClick={() => setExplainOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-white hover:bg-emerald-50 border border-emerald-300 text-[#166534] font-bold text-xs flex items-center space-x-1.5 shadow-sm transition cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4 text-[#166534]" />
+              <span>Why This Route?</span>
+            </button>
+
+            <button
+              id="commit-contingency-btn"
+              onClick={handleCommitContingency}
+              className="px-5 py-2.5 rounded-xl bg-[#166534] hover:bg-[#14532d] text-white font-bold text-xs tracking-wider uppercase flex items-center space-x-2 shadow-sm transition"
+            >
+              <Navigation className="w-4 h-4 fill-white text-white" />
+              <span>Apply Contingency to Map</span>
+            </button>
           </div>
         </div>
-
-        <button
-          id="commit-contingency-btn"
-          onClick={handleCommitContingency}
-          className="px-5 py-2.5 rounded-xl bg-[#166534] hover:bg-[#14532d] text-white font-bold text-xs tracking-wider uppercase flex items-center space-x-2 shadow-sm transition"
-        >
-          <Navigation className="w-4 h-4 fill-white text-white" />
-          <span>Apply Contingency to Map</span>
-        </button>
-      </div>
 
       {/* Contingency telemetry highlights */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
@@ -91,5 +106,12 @@ export const ContingencyCard: React.FC = () => {
         </ul>
       </div>
     </div>
-  );
+
+    <RouteExplanationPanel
+      route={contingencyRoute}
+      isOpen={explainOpen}
+      onClose={() => setExplainOpen(false)}
+    />
+  </>
+);
 };

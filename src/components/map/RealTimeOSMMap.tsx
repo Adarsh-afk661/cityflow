@@ -15,7 +15,12 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
   const routeLayerRef = useRef<L.Polyline | null>(null);
   const markersGroupRef = useRef<L.LayerGroup | null>(null);
 
-  const { selectedRoute, selectedVehicle } = useCityFlow();
+  const {
+    selectedRoute,
+    selectedVehicle,
+    startLocation,
+    destinationLocation
+  } = useCityFlow();
 
   const [searchQuery, setSearchQuery] = useState('Central Logistics Hub');
   const [isSearching, setIsSearching] = useState(false);
@@ -64,6 +69,65 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
     if (!mapInstanceRef.current) return;
 
     const fetchLiveRoute = async () => {
+      // If selectedRoute already has real OSRM coordinates from backend journey API, render directly
+      if (selectedRoute && (selectedRoute as any).realCoordinates && (selectedRoute as any).realCoordinates.length > 0) {
+        const coords = (selectedRoute as any).realCoordinates;
+        const latLngs: L.LatLngExpression[] = coords.map((c: [number, number]) => [c[1], c[0]]);
+
+        setRouteInfo({
+          distanceKm: selectedRoute.distanceKm,
+          durationMin: selectedRoute.currentEtaMin,
+          source: 'OSRM Live Real-Time Road Geometry'
+        });
+
+        if (routeLayerRef.current && mapInstanceRef.current) {
+          mapInstanceRef.current.removeLayer(routeLayerRef.current);
+        }
+
+        const isBarred = selectedRoute.clearanceStatus === 'failed';
+        const polyline = L.polyline(latLngs, {
+          color: isBarred ? '#e11d48' : '#166534',
+          weight: 5,
+          opacity: 0.9,
+          lineCap: 'round',
+          lineJoin: 'round'
+        }).addTo(mapInstanceRef.current!);
+
+        routeLayerRef.current = polyline;
+
+        // Fit map bounds
+        const bounds = L.latLngBounds(latLngs);
+        mapInstanceRef.current!.fitBounds(bounds, { padding: [40, 40] });
+
+        // Update markers
+        if (markersGroupRef.current && latLngs.length > 1) {
+          markersGroupRef.current.clearLayers();
+          const startPt = latLngs[0] as [number, number];
+          const endPt = latLngs[latLngs.length - 1] as [number, number];
+
+          const startIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div style="background-color: #166534; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">A</div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+          });
+          L.marker(startPt, { icon: startIcon })
+            .bindPopup(`<strong>Origin: ${startLocation || selectedRoute.name}</strong>`)
+            .addTo(markersGroupRef.current);
+
+          const destIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div style="background-color: #b91c1c; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">B</div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+          });
+          L.marker(endPt, { icon: destIcon })
+            .bindPopup(`<strong>Destination: ${destinationLocation || selectedRoute.corridorName}</strong>`)
+            .addTo(markersGroupRef.current);
+        }
+        return;
+      }
+
       // Calculate realistic destination ~5-8km away based on center
       const [lat, lon] = currentCenter;
       const destLat = lat + 0.055;
@@ -236,7 +300,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
 
       {/* Live Route Telemetry HUD Pill */}
       {routeInfo && (
-        <div className="absolute top-3 right-3 z-10 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-slate-200 shadow-md flex items-center space-x-3 text-xs">
+        <div className="absolute top-14 right-3 z-10 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-slate-200 shadow-md flex items-center space-x-3 text-xs">
           <div className="flex items-center space-x-1.5">
             <Navigation className="w-3.5 h-3.5 text-[#166534]" />
             <span className="font-bold text-slate-900">{routeInfo.distanceKm} km</span>

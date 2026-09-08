@@ -1,0 +1,76 @@
+{
+  "timestamp": "2026-09-08T21:11:01.574930Z",
+  "xgboost_version": "3.4.1",
+  "eta_model": {
+    "version": "cityflow-eta-v1",
+    "algorithm": "XGBoost Regressor",
+    "artifact": "models\\eta\\model.json",
+    "metrics": {
+      "mae_minutes": 2.029,
+      "rmse_minutes": 2.628,
+      "mape_percent": 5.27,
+      "r2_score": 0.9865
+    }
+  },
+  "delay_model": {
+    "version": "cityflow-delay-v1",
+    "algorithm": "XGBoost Binary Classifier",
+    "artifact": "models\\delay\\model.json",
+    "metrics": {
+      "precision": 0.867,
+      "recall": 0.822,
+      "f1_score": 0.844,
+      "roc_auc": 0.8903
+    }
+  },
+  "data_split": {
+    "train_samples": 3500,
+    "val_samples": 750,
+    "test_samples": 750,
+    "total_samples": 5000,
+    "method": "Chronological Windowing (Zero Data Leakage)",
+    "start_time": "2026-01-01T06:00:00",
+    "end_time": "2026-03-04T17:42:00"
+  },
+  "features": [
+    "distance_km",
+    "base_duration_min",
+    "traffic_speed_kmh",
+    "free_flow_speed_kmh",
+    "congestion_ratio",
+    "hour",
+    "day_of_week",
+    "weekend",
+    "rainfall_mm",
+    "visibility_km",
+    "temperature_c",
+    "incident_count",
+    "incident_severity",
+    "road_type_encoded",
+    "vehicle_type_encoded",
+    "route_length_km",
+    "historical_mean_time",
+    "historical_std_time"
+  ],
+  "feature_importance": {
+    "historical_std_time": 0.6438999772071838,
+    "historical_mean_time": 0.2012999951839447,
+    "traffic_speed_kmh": 0.0851999968290329,
+    "congestion_ratio": 0.05510000139474869,
+    "distance_km": 0.0052999998442828655,
+    "base_duration_min": 0.0027000000700354576,
+    "route_length_km": 0.0013000000035390258,
+    "free_flow_speed_kmh": 0.0008999999845400453,
+    "weekend": 0.0005000000237487257,
+    "incident_severity": 0.0005000000237487257,
+    "temperature_c": 0.0005000000237487257,
+    "hour": 0.0005000000237487257,
+    "visibility_km": 0.0005000000237487257,
+    "rainfall_mm": 0.00039999998989515007,
+    "road_type_encoded": 0.00039999998989515007,
+    "day_of_week": 0.00039999998989515007,
+    "vehicle_type_encoded": 0.0003000000142492354,
+    "incident_count": 0.0003000000142492354
+  },
+  "status": "ACTIVE"
+}

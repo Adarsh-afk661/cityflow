@@ -16,6 +16,7 @@ import { useCityFlow } from '../../context/CityFlowContext';
 import { CITY_INFRASTRUCTURE, CITY_HUBS } from '../../data/cityNetwork';
 import { CityZone } from '../../types';
 import { RealTimeOSMMap } from './RealTimeOSMMap';
+import { GoogleFleetMap } from './GoogleFleetMap';
 
 interface CityMapProps {
   heightClass?: string;
@@ -37,7 +38,7 @@ export const CityMap: React.FC<CityMapProps> = ({
     liveTrafficEnabled
   } = useCityFlow();
 
-  const [mapMode, setMapMode] = useState<'blueprint' | 'osm'>('blueprint');
+  const [mapMode, setMapMode] = useState<'google' | 'osm' | 'blueprint'>('google');
   const [zoom, setZoom] = useState(1.0);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [activeLayers, setActiveLayers] = useState({
@@ -72,36 +73,47 @@ export const CityMap: React.FC<CityMapProps> = ({
   };
 
   return (
-    <div className={`relative w-full ${heightClass} bg-[#f8fafc] rounded-2xl overflow-hidden border border-slate-200 shadow-sm select-none group text-left`}>
-      {/* Map Mode Switcher (Blueprint vs Real-Time OpenStreetMap) */}
-      <div className={`absolute z-30 flex items-center bg-white/95 backdrop-blur-md p-1 rounded-xl border border-slate-200 shadow-md ${
-        mapMode === 'osm' ? 'top-3 left-3 sm:left-[405px]' : 'top-3 left-3'
-      }`}>
+    <div className={`relative w-full ${heightClass} bg-[#0f172a] rounded-2xl overflow-hidden border border-slate-800 shadow-sm select-none group text-left`}>
+      {/* Map Mode Switcher (Google Maps vs OpenStreetMap vs Digital Twin) */}
+      <div className="absolute z-30 top-3 right-3 flex items-center bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-700 shadow-md">
         <button
-          onClick={() => setMapMode('blueprint')}
+          onClick={() => setMapMode('google')}
           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
-            mapMode === 'blueprint'
+            mapMode === 'google'
               ? 'bg-[#166534] text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
-          <Compass className="w-3.5 h-3.5" />
-          <span>Digital Twin Blueprint</span>
+          <Globe2 className="w-3.5 h-3.5 text-emerald-300" />
+          <span>Google Maps Platform</span>
         </button>
         <button
           onClick={() => setMapMode('osm')}
           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
             mapMode === 'osm'
               ? 'bg-[#166534] text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
-          <Globe2 className="w-3.5 h-3.5" />
-          <span>Live OpenStreetMap (Real Tiles)</span>
+          <Compass className="w-3.5 h-3.5" />
+          <span>OpenStreetMap Live</span>
+        </button>
+        <button
+          onClick={() => setMapMode('blueprint')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
+            mapMode === 'blueprint'
+              ? 'bg-[#166534] text-white shadow-xs'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>Blueprint</span>
         </button>
       </div>
 
-      {mapMode === 'osm' ? (
+      {mapMode === 'google' ? (
+        <GoogleFleetMap heightClass={heightClass} />
+      ) : mapMode === 'osm' ? (
         <RealTimeOSMMap heightClass={heightClass} />
       ) : (
         <>

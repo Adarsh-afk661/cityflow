@@ -291,11 +291,42 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
     setIsAnalyzing(true);
     setAnalysisStage(0);
 
+    // 7-stage animated pipeline
     for (let step = 0; step < 7; step++) {
       setAnalysisStage(step);
-      await new Promise(resolve => setTimeout(resolve, 380));
+      await new Promise(resolve => setTimeout(resolve, 220));
     }
 
+    try {
+      const response = await fetch('/api/routing/journey', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start: startLocation,
+          destination: destinationLocation,
+          vehicle: selectedVehicle,
+          routingMode
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && Array.isArray(data.candidateRoutes) && data.candidateRoutes.length > 0) {
+          setCandidateRoutes(data.candidateRoutes);
+          const topFeasible =
+            data.candidateRoutes.find((r: any) => r.isRecommended) ||
+            data.candidateRoutes.find((r: any) => r.clearanceStatus === 'approved') ||
+            data.candidateRoutes[0];
+          setSelectedRoute(topFeasible);
+          setIsAnalyzing(false);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('[CityFlow] Live API journey query fallback:', err);
+    }
+
+    // Offline / Network Degradation Fallback
     const calculated = evaluateRoutes(selectedVehicle, routingMode);
     setCandidateRoutes(calculated);
     const topFeasible = calculated.find(r => r.isRecommended) || calculated.find(r => r.clearanceStatus === 'approved') || calculated[0];

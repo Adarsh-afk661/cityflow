@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   MapPin,
   Truck,
@@ -7,7 +7,8 @@ import {
   Zap,
   Clock,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  ArrowLeftRight
 } from 'lucide-react';
 import { useCityFlow } from '../../context/CityFlowContext';
 import { RoutingMode } from '../../types';
@@ -34,6 +35,70 @@ export const RoutePlanner: React.FC = () => {
   const [customModalOpen, setCustomModalOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const [startQuery, setStartQuery] = useState(startLocation);
+  const [destQuery, setDestQuery] = useState(destinationLocation);
+  const [startSuggestions, setStartSuggestions] = useState<any[]>([]);
+  const [destSuggestions, setDestSuggestions] = useState<any[]>([]);
+  const [activeDropdown, setActiveDropdown] = useState<'start' | 'dest' | null>(null);
+
+  // Sync input query when context changes
+  useEffect(() => {
+    setStartQuery(startLocation);
+  }, [startLocation]);
+
+  useEffect(() => {
+    setDestQuery(destinationLocation);
+  }, [destinationLocation]);
+
+  // Dismiss dropdowns on outside click
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('#start-location-group') && !target.closest('#destination-location-group')) {
+        setActiveDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  // Live Geocoding Autocomplete Debounce
+  const searchGeocode = async (query: string, type: 'start' | 'dest') => {
+    if (query.trim().length < 2) {
+      if (type === 'start') setStartSuggestions([]);
+      else setDestSuggestions([]);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/map/geocode?q=${encodeURIComponent(query)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          if (type === 'start') setStartSuggestions(data);
+          else setDestSuggestions(data);
+        }
+      }
+    } catch (e) {}
+  };
+
+  const handleSwap = () => {
+    const prevStart = startLocation;
+    const prevDest = destinationLocation;
+    setStartLocation(prevDest);
+    setStartQuery(prevDest);
+    setDestinationLocation(prevStart);
+    setDestQuery(prevStart);
+    setActiveDropdown(null);
+  };
+
+  const corridorPresets = [
+    { label: 'Noida ➔ Connaught Place', start: 'Noida Sector 62', dest: 'Connaught Place, New Delhi' },
+    { label: 'Greater Noida ➔ Delhi Airport', start: 'Greater Noida Logistics Park', dest: 'Indira Gandhi International Airport, Delhi' },
+    { label: 'Cyber City ➔ Central Delhi', start: 'Cyber City, Gurugram', dest: 'Connaught Place, New Delhi' },
+    { label: 'Noida ➔ Delhi Airport', start: 'Noida Sector 62', dest: 'Indira Gandhi International Airport, Delhi' },
+    { label: 'Central Hub ➔ North Depot', start: 'Central Warehouse', dest: 'North Distribution Hub' }
+  ];
+
   const modes: { id: RoutingMode; label: string; desc: string }[] = [
     { id: 'fastest', label: 'Fastest', desc: 'Minimal travel time' },
     { id: 'reliable', label: 'Reliable', desc: 'Predictable on-time delivery' },
@@ -45,14 +110,14 @@ export const RoutePlanner: React.FC = () => {
   const handleAnalyze = () => {
     setFormError(null);
     if (!startLocation.trim()) {
-      setFormError('Please select a start location.');
+      setFormError('Please enter a valid start location.');
       return;
     }
     if (!destinationLocation.trim()) {
-      setFormError('Please select a destination.');
+      setFormError('Please enter a valid destination.');
       return;
     }
-    if (startLocation === destinationLocation) {
+    if (startLocation.trim().toLowerCase() === destinationLocation.trim().toLowerCase()) {
       setFormError('Start and destination locations cannot be identical.');
       return;
     }
@@ -64,7 +129,7 @@ export const RoutePlanner: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 mb-5 border-b border-slate-100 gap-2">
         <div>
           <h2 className="text-lg font-bold text-slate-900 tracking-tight">Route Planning & Clearance Matrix</h2>
-          <p className="text-xs text-slate-500">Configure vehicle physical constraints and multi-criteria routing weights</p>
+          <p className="text-xs text-slate-500">Enter arbitrary origin & destination for real-time GIS routing and vehicle clearance</p>
         </div>
         <div className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[#166534] text-xs font-semibold">
           <ShieldCheck className="w-3.5 h-3.5" />
@@ -79,41 +144,123 @@ export const RoutePlanner: React.FC = () => {
         </div>
       )}
 
+      {/* Paired Quick Corridor Presets Bar */}
+      <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-slate-400 font-mono text-[11px] font-bold uppercase">Corridor Presets:</span>
+        {corridorPresets.map(preset => (
+          <button
+            key={preset.label}
+            type="button"
+            onClick={() => {
+              setStartLocation(preset.start);
+              setStartQuery(preset.start);
+              setDestinationLocation(preset.dest);
+              setDestQuery(preset.dest);
+              setActiveDropdown(null);
+            }}
+            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 hover:text-[#166534] font-medium text-[11px] transition cursor-pointer"
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
-        {/* Start Location */}
-        <div>
+        {/* Start Location Input with Live Autocomplete */}
+        <div id="start-location-group" className="relative">
           <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center space-x-1">
             <MapPin className="w-3.5 h-3.5 text-blue-700" />
-            <span>START LOCATION</span>
+            <span>ORIGIN / SOURCE</span>
           </label>
-          <select
-            id="start-location-select"
-            value={startLocation}
-            onChange={e => setStartLocation(e.target.value)}
+          <input
+            id="start-location-input"
+            type="text"
+            value={startQuery}
+            onChange={e => {
+              setStartQuery(e.target.value);
+              setStartLocation(e.target.value);
+              searchGeocode(e.target.value, 'start');
+              setActiveDropdown('start');
+            }}
+            onFocus={() => setActiveDropdown('start')}
+            placeholder="Enter any address, city or hub..."
             className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-emerald-600 focus:bg-white transition"
-          >
-            {CITY_HUBS.map(hub => (
-              <option key={hub.id} value={hub.name}>{hub.name}</option>
-            ))}
-          </select>
+          />
+
+          {/* Autocomplete Dropdown */}
+          {activeDropdown === 'start' && startSuggestions.length > 0 && (
+            <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto divide-y divide-slate-100">
+              {startSuggestions.map((sug, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setStartLocation(sug.display_name);
+                    setStartQuery(sug.display_name);
+                    setActiveDropdown(null);
+                  }}
+                  className="w-full text-left p-2.5 hover:bg-emerald-50 text-xs text-slate-800 transition flex items-start space-x-2"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                  <span className="line-clamp-2">{sug.display_name}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Destination Location */}
-        <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center space-x-1">
-            <MapPin className="w-3.5 h-3.5 text-emerald-700" />
-            <span>DESTINATION</span>
-          </label>
-          <select
-            id="destination-location-select"
-            value={destinationLocation}
-            onChange={e => setDestinationLocation(e.target.value)}
+        {/* Destination Location Input with Live Autocomplete */}
+        <div id="destination-location-group" className="relative">
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-bold text-slate-700 flex items-center space-x-1">
+              <MapPin className="w-3.5 h-3.5 text-emerald-700" />
+              <span>DESTINATION</span>
+            </label>
+            <button
+              type="button"
+              onClick={handleSwap}
+              className="text-[11px] font-bold text-[#166534] hover:text-[#14532d] flex items-center space-x-1 transition cursor-pointer"
+              title="Reverse origin and destination"
+            >
+              <ArrowLeftRight className="w-3 h-3" />
+              <span>Swap</span>
+            </button>
+          </div>
+          <input
+            id="destination-location-input"
+            type="text"
+            value={destQuery}
+            onChange={e => {
+              setDestQuery(e.target.value);
+              setDestinationLocation(e.target.value);
+              searchGeocode(e.target.value, 'dest');
+              setActiveDropdown('dest');
+            }}
+            onFocus={() => setActiveDropdown('dest')}
+            placeholder="Enter any destination address..."
             className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-emerald-600 focus:bg-white transition"
-          >
-            {CITY_HUBS.map(hub => (
-              <option key={hub.id} value={hub.name}>{hub.name}</option>
-            ))}
-          </select>
+          />
+
+          {/* Autocomplete Dropdown */}
+          {activeDropdown === 'dest' && destSuggestions.length > 0 && (
+            <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto divide-y divide-slate-100">
+              {destSuggestions.map((sug, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setDestinationLocation(sug.display_name);
+                    setDestQuery(sug.display_name);
+                    setActiveDropdown(null);
+                  }}
+                  className="w-full text-left p-2.5 hover:bg-emerald-50 text-xs text-slate-800 transition flex items-start space-x-2"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                  <span className="line-clamp-2">{sug.display_name}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Vehicle Selection with Dimensions */}

@@ -14,6 +14,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { useCityFlow } from '../../context/CityFlowContext';
+import { DataStatusIndicator } from '../common/DataStatusIndicator';
 
 export const TopNav: React.FC = () => {
   const {
@@ -100,6 +101,9 @@ export const TopNav: React.FC = () => {
           <Globe className="w-3.5 h-3.5 text-emerald-700" />
           <span>Product Overview</span>
         </button>
+
+        {/* Real-time Data Freshness & Provider Status */}
+        <DataStatusIndicator />
 
         {/* Live Simulation Control */}
         <div className="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">

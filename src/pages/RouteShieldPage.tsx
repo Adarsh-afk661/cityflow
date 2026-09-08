@@ -28,8 +28,44 @@ export const RouteShieldPage: React.FC = () => {
   } = useCityFlow();
 
   const [compareModalOpen, setCompareModalOpen] = useState(false);
+  const [rerouteFeedback, setRerouteFeedback] = useState<string | null>(null);
 
   const failedRoutes = candidateRoutes.filter(r => r.clearanceStatus === 'failed');
+  const approvedRoutes = candidateRoutes.filter(r => r.clearanceStatus === 'approved');
+  const recommendedRoute = candidateRoutes.find(r => r.isRecommended) || approvedRoutes[0];
+
+  // Evaluate if Smart Reroute is recommended
+  let smartRerouteCandidate = null;
+  let rerouteReason = '';
+  let isMandatoryClearanceReroute = false;
+
+  if (selectedRoute && selectedRoute.clearanceStatus === 'failed') {
+    // Critical: selected route is physically barred!
+    isMandatoryClearanceReroute = true;
+    smartRerouteCandidate = recommendedRoute || approvedRoutes[0];
+    rerouteReason = `Active corridor "${selectedRoute.name}" is physically BARRED for ${selectedVehicle.name} (${selectedVehicle.height}m H / ${selectedVehicle.weight}T). Reroute immediately to avoid collisions.`;
+  } else if (selectedRoute && approvedRoutes.length > 1) {
+    // Check if an alternative route has significantly lower delay risk or faster ETA
+    const alternative = approvedRoutes.find(
+      r => r.id !== selectedRoute.id && (
+        (selectedRoute.delayRiskPercent - r.delayRiskPercent >= 10) ||
+        (selectedRoute.currentEtaMin - r.currentEtaMin >= 4 && r.reliabilityScore >= 85) ||
+        (selectedRoute.delayRiskPercent >= 35 && r.delayRiskPercent <= 15)
+      )
+    );
+    if (alternative) {
+      smartRerouteCandidate = alternative;
+      const riskDiff = selectedRoute.delayRiskPercent - alternative.delayRiskPercent;
+      const timeDiff = selectedRoute.currentEtaMin - alternative.currentEtaMin;
+      rerouteReason = `Elevated delay probability (${selectedRoute.delayRiskPercent}%) detected on current route. "${alternative.name}" offers ${riskDiff > 0 ? `${riskDiff}% lower risk` : 'higher reliability'}${timeDiff > 0 ? ` and saves ${timeDiff} minutes` : ''}.`;
+    }
+  }
+
+  const handleApplyReroute = (candidate: any) => {
+    setSelectedRoute(candidate);
+    setRerouteFeedback(`Switched active corridor to ${candidate.name}`);
+    setTimeout(() => setRerouteFeedback(null), 3500);
+  };
 
   return (
     <div className="space-y-6 text-left">
@@ -66,8 +102,67 @@ export const RouteShieldPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Reroute Feedback Notification */}
+      {rerouteFeedback && (
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-300 text-xs text-[#166534] font-bold flex items-center space-x-2 animate-in fade-in slide-in-from-top-2">
+          <CheckCircle2 className="w-4 h-4 text-[#166534]" />
+          <span>{rerouteFeedback}</span>
+        </div>
+      )}
+
       {/* Primary Route Parameter Matrix Form */}
       <RoutePlanner />
+
+      {/* Smart Reroute Command Center Recommendation Banner */}
+      {smartRerouteCandidate && (
+        <div className={`p-4 sm:p-5 rounded-2xl border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${
+          isMandatoryClearanceReroute
+            ? 'bg-rose-50 border-rose-300 text-rose-900'
+            : 'bg-[#ecfdf5] border-emerald-400 text-slate-900'
+        }`}>
+          <div className="flex items-start space-x-3.5">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
+              isMandatoryClearanceReroute
+                ? 'bg-rose-600 text-white'
+                : 'bg-[#166534] text-white'
+            }`}>
+              <Zap className="w-5 h-5 fill-white text-white" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className={`text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                  isMandatoryClearanceReroute
+                    ? 'bg-rose-200 text-rose-900 font-extrabold'
+                    : 'bg-emerald-200 text-[#166534]'
+                }`}>
+                  {isMandatoryClearanceReroute ? 'MANDATORY CLEARANCE REROUTE' : 'SMART REROUTE RECOMMENDED'}
+                </span>
+                <span className="text-xs font-bold font-mono">
+                  {smartRerouteCandidate.currentEtaMin}m ETA · {smartRerouteCandidate.reliabilityScore}/100 Reliability
+                </span>
+              </div>
+              <p className="text-xs font-medium mt-1 leading-relaxed">
+                {rerouteReason}
+              </p>
+            </div>
+          </div>
+
+          <div className="shrink-0 flex items-center space-x-2">
+            <button
+              id="smart-reroute-apply-btn"
+              onClick={() => handleApplyReroute(smartRerouteCandidate)}
+              className={`px-5 py-2.5 rounded-xl font-bold text-xs tracking-wide uppercase flex items-center space-x-2 transition shadow-md cursor-pointer ${
+                isMandatoryClearanceReroute
+                  ? 'bg-rose-700 hover:bg-rose-800 text-white shadow-rose-200'
+                  : 'bg-[#166534] hover:bg-[#14532d] text-white shadow-emerald-200'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 fill-white" />
+              <span>Reroute to {smartRerouteCandidate.name.split('—')[0]}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Interactive Map & Routes Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -86,7 +181,7 @@ export const RouteShieldPage: React.FC = () => {
           </div>
 
           {/* Clearance Notice Banner if any routes failed */}
-          {failedRoutes.length > 0 && (
+          {failedRoutes.length > 0 && !isMandatoryClearanceReroute && (
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 font-medium flex items-start space-x-2.5">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
               <div>

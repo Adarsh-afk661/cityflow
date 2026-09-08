@@ -297,42 +297,180 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
     setSelectedRoute(recommended);
   }, []);
 
-  // Periodic simulated live traffic tick
+  // ─────────────────────────────────────────────────────────────
+  // REAL-TIME FLEET TELEMETRY SIMULATION ENGINE
+  // Updates speed, ETA, reliability, CO₂, status and coordinates
+  // every 3 seconds based on:
+  //   • Route type free-flow speed (expressway 60, beltway 55, arterial 40)
+  //   • Current hour rush-hour factor (8-10am, 5-8pm = 0.45x speed)
+  //   • Zone congestion pressure from city zones
+  //   • Random incident micro-events (brake, bottleneck, green wave)
+  //   • CO₂ accumulation proportional to current speed + vehicle weight
+  // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!liveTrafficEnabled) return;
 
+    // Route baseline free-flow speeds (km/h)
+    const ROUTE_FREE_FLOW: Record<string, number> = {
+      'route-a': 55,   // Expressway/Arterial
+      'route-b': 65,   // Ring Beltway + Flyover
+      'route-c': 60,   // Eco Green Corridor
+      '': 0            // Idling / maintenance
+    };
+
+    // Route name location waypoints for GPS drift simulation
+    const ROUTE_WAYPOINTS: Record<string, { x: number; y: number }[]> = {
+      'route-a': [{ x: 310, y: 390 }, { x: 340, y: 370 }, { x: 370, y: 350 }, { x: 400, y: 330 }],
+      'route-b': [{ x: 220, y: 310 }, { x: 250, y: 270 }, { x: 280, y: 240 }, { x: 310, y: 220 }],
+      'route-c': [{ x: 360, y: 240 }, { x: 390, y: 210 }, { x: 420, y: 185 }, { x: 450, y: 165 }],
+    };
+
+    // Realistic location labels along each route
+    const ROUTE_LOCATION_NAMES: Record<string, string[]> = {
+      'route-a': [
+        'Expressway A-10 South Approach',
+        'Financial District Gateway (Bottleneck)',
+        'NH-9 Arterial Interchange',
+        'Vikas Marg Underpass Checkpoint',
+        'Expressway A-10 North Segment'
+      ],
+      'route-b': [
+        'Outer Ring Viaduct km 18',
+        'West Beltway Interchange',
+        'Ring Road Elevated Flyover',
+        'Outer Ring km 24 — Smooth',
+        'Beltway North Sector Entry'
+      ],
+      'route-c': [
+        'Eco-Flow Parkway Sector 4',
+        'Green Corridor — Optimal Speed',
+        'Elevated Viaduct Sector 7',
+        'Eco Zone — Clean Air Corridor',
+        'Parkway North Exit'
+      ]
+    };
+
     const interval = setInterval(() => {
+      const now = new Date();
+      const hour = now.getHours();
+
+      // Rush hour factor: 0.40x at peak, 0.85x at off-peak
+      const isRushHour = (hour >= 8 && hour <= 10) || (hour >= 17 && hour <= 20);
+      const rushFactor = isRushHour ? 0.42 + Math.random() * 0.18 : 0.78 + Math.random() * 0.14;
+
       setLiveTick(prev => prev + 1);
 
-      // Jiggle zone pressure slightly to simulate dynamic pulse
+      // 1. Update city zone pressure
       setCityZones(prev =>
         prev.map(zone => {
-          const delta = (Math.random() - 0.48) * 3;
-          const newScore = Math.max(30, Math.min(98, Math.round(zone.pressureScore + delta)));
+          const delta = (Math.random() - 0.48) * 4;
+          const newScore = Math.max(28, Math.min(96, Math.round(zone.pressureScore + delta)));
           return {
             ...zone,
             pressureScore: newScore,
+            avgSpeedKmh: Math.max(10, Math.round(65 * (1 - newScore / 100))),
             status: newScore > 80 ? 'severe' : newScore > 65 ? 'heavy' : newScore > 45 ? 'moderate' : 'smooth'
           };
         })
       );
 
-      // Slightly move vehicles on active routes
+      // 2. Real-time fleet telemetry update
       setFleet(prevFleet =>
         prevFleet.map(veh => {
-          if (veh.status !== 'active') return veh;
-          const jitterX = (Math.random() - 0.5) * 2;
-          const jitterY = (Math.random() - 0.5) * 2;
+          // Idling / maintenance — no telemetry change, just minor ETA drift
+          if (veh.status === 'idling' || veh.status === 'maintenance') {
+            return veh;
+          }
+
+          const freeFlow = ROUTE_FREE_FLOW[veh.routeId] ?? 50;
+
+          // Speed simulation: free_flow × rush_factor + micro noise + incident penalty
+          const hasIncident = veh.alertsCount > 0;
+          const incidentPenalty = hasIncident ? 12 + Math.random() * 8 : 0;
+          const microNoise = (Math.random() - 0.5) * 6;
+          let newSpeed = Math.max(8, Math.min(
+            freeFlow,
+            freeFlow * rushFactor - incidentPenalty + microNoise
+          ));
+
+          // Delayed vehicles are slower
+          if (veh.status === 'delayed') {
+            newSpeed = Math.max(6, newSpeed * (0.35 + Math.random() * 0.25));
+          }
+          newSpeed = Math.round(newSpeed);
+
+          // ETA recalculation: if speed improves, ETA drops; if stuck, ETA grows
+          const etaDelta = newSpeed > 40 ? -(1 + Math.random()) : (0.5 + Math.random() * 1.5);
+          const newEta = Math.max(3, Math.round(veh.etaMin + etaDelta));
+
+          // Reliability score: degrades when delayed/incident, recovers on green wave
+          const reliabilityDelta = hasIncident
+            ? -(Math.random() * 0.6)
+            : newSpeed > 50
+            ? +(Math.random() * 0.4)
+            : (Math.random() - 0.5) * 0.3;
+          const newReliability = Math.max(35, Math.min(99, Math.round((veh.reliabilityScore + reliabilityDelta) * 10) / 10));
+
+          // Status: dynamically promote/demote based on speed
+          let newStatus: FleetVehicle['status'] = veh.status;
+          if (newSpeed < 20) {
+            newStatus = 'delayed';
+          } else if (newSpeed >= 20 && veh.status === 'delayed' && Math.random() > 0.85) {
+            newStatus = 'active';
+          }
+
+          // CO₂ accumulates in real-time:
+          // kg/tick = (speed_km_h / 3600 * 3sec_interval) * emission_rate_kg_per_km
+          // Heavy trucks emit ~0.95 kg/km, vans ~0.22 kg/km, buses ~0.80 kg/km
+          const emissionRate = veh.type === 'truck' ? 0.95 : veh.type === 'bus' ? 0.80 : 0.22;
+          const distanceThisTick = (newSpeed / 3600) * 3; // km covered in 3s
+          const co2Increment = distanceThisTick * emissionRate * veh.vehicleSpecs.weight / 10;
+          const newCo2 = Math.round((veh.co2TodayKg + co2Increment) * 10) / 10;
+
+          // Risk level follows status
+          const newRisk: 'low' | 'medium' | 'high' =
+            newStatus === 'delayed' ? 'high'
+            : newReliability < 75 ? 'medium'
+            : 'low';
+
+          // GPS movement: move along route waypoints
+          const waypoints = ROUTE_WAYPOINTS[veh.routeId];
+          let newCoords = veh.coordinates;
+          if (waypoints && newStatus === 'active') {
+            const driftX = (Math.random() - 0.5) * 3;
+            const driftY = (Math.random() - 0.5) * 3;
+            newCoords = {
+              x: Math.round(veh.coordinates.x + driftX),
+              y: Math.round(veh.coordinates.y + driftY)
+            };
+          } else if (waypoints && newStatus === 'delayed') {
+            // Barely moving — tiny jitter only
+            newCoords = {
+              x: Math.round(veh.coordinates.x + (Math.random() - 0.5) * 0.8),
+              y: Math.round(veh.coordinates.y + (Math.random() - 0.5) * 0.8)
+            };
+          }
+
+          // Occasionally rotate location label for realism
+          const locationNames = ROUTE_LOCATION_NAMES[veh.routeId];
+          const newLocationName = locationNames && Math.random() > 0.85
+            ? locationNames[Math.floor(Math.random() * locationNames.length)]
+            : veh.locationName;
+
           return {
             ...veh,
-            coordinates: {
-              x: Math.round(veh.coordinates.x + jitterX),
-              y: Math.round(veh.coordinates.y + jitterY)
-            }
+            speedKmh: newSpeed,
+            etaMin: newEta,
+            reliabilityScore: newReliability,
+            co2TodayKg: newCo2,
+            status: newStatus,
+            riskLevel: newRisk,
+            coordinates: newCoords,
+            locationName: newLocationName
           };
         })
       );
-    }, 4000);
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [liveTrafficEnabled]);

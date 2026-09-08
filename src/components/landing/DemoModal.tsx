@@ -41,7 +41,7 @@ export const DemoModal: React.FC<DemoModalProps> = ({ isOpen, onClose, onSuccess
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[99999] p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-md bg-white rounded-2xl p-6 md:p-8 shadow-2xl border border-slate-200 relative">
         <button
           onClick={onClose}

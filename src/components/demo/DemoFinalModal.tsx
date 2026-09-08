@@ -8,7 +8,7 @@ export const DemoFinalModal: React.FC = () => {
   if (!demoFinalModalOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[99999] p-4">
       <div className="w-full max-w-xl bg-white border border-slate-200 rounded-3xl p-7 shadow-2xl text-left">
         {/* Celebration Header */}
         <div className="flex items-start justify-between pb-4 mb-4 border-b border-slate-100">

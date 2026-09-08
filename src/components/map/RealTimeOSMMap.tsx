@@ -36,10 +36,10 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
         zoomControl: false
       });
 
-      // Crisp, light OpenStreetMap Carto Voyager tiles
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, &copy; <a href="https://carto.com/">CARTO</a>',
-        subdomains: 'abcd',
+      // Crisp OpenStreetMap standard clean tiles (No API key required, 100% clean)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        subdomains: ['a', 'b', 'c'],
         maxZoom: 19
       }).addTo(map);
 
@@ -195,9 +195,9 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
   };
 
   return (
-    <div className={`relative w-full ${heightClass} bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 shadow-sm text-left`}>
+    <div className={`relative isolate z-0 w-full ${heightClass} bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 shadow-sm text-left`}>
       {/* Search Header Bar (Real-Time OSM Geocoding) */}
-      <div className="absolute top-3 left-3 right-3 sm:right-auto sm:w-96 z-[1000]">
+      <div className="absolute top-3 left-3 right-3 sm:right-auto sm:w-96 z-10">
         <form onSubmit={handleSearch} className="relative flex items-center shadow-md rounded-xl">
           <input
             type="text"
@@ -236,7 +236,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
 
       {/* Live Route Telemetry HUD Pill */}
       {routeInfo && (
-        <div className="absolute top-3 right-3 z-[1000] bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-slate-200 shadow-md flex items-center space-x-3 text-xs">
+        <div className="absolute top-3 right-3 z-10 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-slate-200 shadow-md flex items-center space-x-3 text-xs">
           <div className="flex items-center space-x-1.5">
             <Navigation className="w-3.5 h-3.5 text-[#166534]" />
             <span className="font-bold text-slate-900">{routeInfo.distanceKm} km</span>
@@ -256,7 +256,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
       <div ref={mapContainerRef} className="w-full h-full" style={{ minHeight: '100%' }} />
 
       {/* Map Legend & Layer Attribution */}
-      <div className="absolute bottom-3 left-3 z-[1000] bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm flex items-center space-x-4 text-[11px] text-slate-700 font-medium pointer-events-auto">
+      <div className="absolute bottom-3 left-3 z-10 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm flex items-center space-x-4 text-[11px] text-slate-700 font-medium pointer-events-auto">
         <div className="flex items-center space-x-1.5">
           <span className="w-2.5 h-2.5 rounded-full bg-[#166534]" />
           <span>Origin (A)</span>

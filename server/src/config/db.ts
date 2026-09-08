@@ -16,7 +16,8 @@ export const connectDB = async (customUri?: string): Promise<boolean> => {
       return true;
     }
     await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 3000
+      serverSelectionTimeoutMS: 15000,
+      connectTimeoutMS: 15000
     });
     isConnected = true;
     const isAtlas = uri.includes('mongodb+srv') || uri.includes('mongodb.net');

@@ -275,13 +275,126 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
         }
       });
       markersRef.current.push(destMarker);
+
+      // 3. Accident / Collision Hazard Marker (💥)
+      const routeA = candidateRoutes.find(r => r.id === 'route-a') || candidateRoutes[0];
+      const routeAWaypoints = (routeA as any).realCoordinates || [];
+      const incidentIdx = Math.floor(routeAWaypoints.length * 0.38);
+      const incidentPt = routeAWaypoints[incidentIdx]
+        ? { lat: routeAWaypoints[incidentIdx][1], lng: routeAWaypoints[incidentIdx][0] }
+        : { lat: 28.6187, lng: 77.2871 };
+
+      const accidentMarker = new google.maps.Marker({
+        position: incidentPt,
+        map,
+        title: 'Severe Incident: Multi-Vehicle Collision (+18 min delay)',
+        label: { text: '💥', fontSize: '18px' },
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 16,
+          fillColor: '#dc2626',
+          fillOpacity: 0.9,
+          strokeColor: '#ffffff',
+          strokeWeight: 2
+        }
+      });
+
+      const accidentInfoWindow = new google.maps.InfoWindow({
+        content: `
+          <div style="color: #0f172a; font-family: sans-serif; padding: 4px;">
+            <strong style="color: #dc2626; font-size: 13px;">💥 LIVE ACCIDENT / COLLISION</strong><br/>
+            <span style="font-size: 11px;">Expressway A-10 (Km 14.8) · 2 Right Lanes Blocked</span><br/>
+            <span style="font-size: 11px; color: #dc2626; font-weight: bold;">+18 min bottleneck queue</span><br/>
+            <div style="margin-top: 4px; font-size: 10px; color: #047857; font-weight: bold;">
+              RouteShield: Outer Ring Beltway (Route B) bypasses this crash
+            </div>
+          </div>
+        `
+      });
+      accidentMarker.addListener('click', () => {
+        accidentInfoWindow.open(map, accidentMarker);
+      });
+      markersRef.current.push(accidentMarker);
+
+      // 4. Weather Advisory Hazard Marker (🌧️)
+      const weatherIdx = Math.floor(waypoints.length * 0.68);
+      const weatherPt = waypoints[weatherIdx]
+        ? { lat: waypoints[weatherIdx][1], lng: waypoints[weatherIdx][0] }
+        : { lat: 28.6255, lng: 77.3125 };
+
+      const weatherMarker = new google.maps.Marker({
+        position: weatherPt,
+        map,
+        title: 'Weather Alert: Heavy Downpour 14.5 mm/h',
+        label: { text: '🌧️', fontSize: '18px' },
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 16,
+          fillColor: '#0284c7',
+          fillOpacity: 0.9,
+          strokeColor: '#ffffff',
+          strokeWeight: 2
+        }
+      });
+
+      const weatherInfoWindow = new google.maps.InfoWindow({
+        content: `
+          <div style="color: #0f172a; font-family: sans-serif; padding: 4px;">
+            <strong style="color: #0284c7; font-size: 13px;">🌧️ LIVE WEATHER ADVISORY</strong><br/>
+            <span style="font-size: 11px;">Heavy Rain (14.5 mm/h) · Wet Road Surface</span><br/>
+            <span style="font-size: 11px; color: #b45309; font-weight: bold;">Braking Distance +35% · Max Speed 45 km/h</span>
+          </div>
+        `
+      });
+      weatherMarker.addListener('click', () => {
+        weatherInfoWindow.open(map, weatherMarker);
+      });
+      markersRef.current.push(weatherMarker);
+
+      // 5. Overhead Clearance Underpass Marker (🚧)
+      const underpassIdx = Math.floor(routeAWaypoints.length * 0.48);
+      const underpassPt = routeAWaypoints[underpassIdx]
+        ? { lat: routeAWaypoints[underpassIdx][1], lng: routeAWaypoints[underpassIdx][0] }
+        : { lat: 28.6211, lng: 77.2850 };
+      const isHeightViolated = selectedVehicle ? selectedVehicle.height > 3.8 : true;
+
+      const underpassMarker = new google.maps.Marker({
+        position: underpassPt,
+        map,
+        title: `Underpass Checkpoint: 3.8m Limit (${isHeightViolated ? 'BARRED' : 'PASSED'})`,
+        label: { text: '🚧', fontSize: '16px' },
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 15,
+          fillColor: isHeightViolated ? '#dc2626' : '#d97706',
+          fillOpacity: 0.9,
+          strokeColor: '#ffffff',
+          strokeWeight: 2
+        }
+      });
+
+      const underpassInfoWindow = new google.maps.InfoWindow({
+        content: `
+          <div style="color: #0f172a; font-family: sans-serif; padding: 4px;">
+            <strong style="color: ${isHeightViolated ? '#dc2626' : '#d97706'}; font-size: 13px;">🚧 METRO UNDERPASS (3.8m LIMIT)</strong><br/>
+            <span style="font-size: 11px;">Vehicle Height: ${selectedVehicle ? selectedVehicle.height : 4.0}m</span><br/>
+            <span style="font-size: 11px; font-weight: bold; color: ${isHeightViolated ? '#dc2626' : '#166534'};">
+              ${isHeightViolated ? '⛔ Physical Clearance Breach — Route Barred' : '✅ Clearance Approved'}
+            </span>
+          </div>
+        `
+      });
+      underpassMarker.addListener('click', () => {
+        underpassInfoWindow.open(map, underpassMarker);
+      });
+      markersRef.current.push(underpassMarker);
     }
 
-    // 3. Smoothly fit map to entire route bounds
+    // Smoothly fit map to entire route bounds
     if (!bounds.isEmpty()) {
       map.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
     }
-  }, [isLoaded, candidateRoutes, selectedRoute, startLocation, destinationLocation]);
+  }, [isLoaded, candidateRoutes, selectedRoute, selectedVehicle, startLocation, destinationLocation]);
 
   // If Google Maps API key is not configured or fails to load, gracefully fall back to live OpenStreetMap
   if (mapError || !googleApiKey) {
@@ -313,18 +426,26 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
 
       <div ref={mapContainerRef} className="w-full h-full" />
 
-      <div className="absolute bottom-3 left-3 z-20 bg-slate-900/90 backdrop-blur-md p-2.5 rounded-xl border border-slate-700 shadow-md text-[11px] text-slate-300 space-y-1.5 font-mono">
+      <div className="absolute bottom-3 left-3 z-20 bg-slate-900/90 backdrop-blur-md p-2.5 rounded-xl border border-slate-700 shadow-md text-[11px] text-slate-300 flex flex-wrap items-center gap-3 font-mono">
         <div className="flex items-center space-x-2">
           <span className="w-3 h-1 bg-[#10b981] rounded-full inline-block" />
-          <span>Active / Selected Corridor</span>
+          <span>Active Route</span>
         </div>
         <div className="flex items-center space-x-2">
           <span className="w-3 h-1 bg-[#3b82f6] rounded-full inline-block" />
-          <span>Alternative Bypass</span>
+          <span>Alt Corridor (Clickable)</span>
         </div>
-        <div className="flex items-center space-x-2">
-          <span className="w-3 h-1 bg-[#ef4444] rounded-full inline-block" />
-          <span>Clearance Barred</span>
+        <div className="flex items-center space-x-1.5">
+          <span>💥</span>
+          <span>Accident</span>
+        </div>
+        <div className="flex items-center space-x-1.5">
+          <span>🌧️</span>
+          <span>Weather</span>
+        </div>
+        <div className="flex items-center space-x-1.5">
+          <span>🚧</span>
+          <span>Underpass</span>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { Infrastructure, CityZone, CandidateRoute } from '../types';
+import defaultCorridorCoords from './defaultCorridorCoordinates.json';
 
 export interface CityHub {
   id: string;
@@ -192,7 +193,8 @@ export const INITIAL_BASE_ROUTES: CandidateRoute[] = [
     ],
     description: 'Fastest nominal arterial route, but runs through high-density urban expressway with low clearance underpass.',
     infrastructureEncountered: ['infra-underpass-1'],
-    tags: ['Fastest Nominal', 'Underpass Warning', 'Congestion Sensitive']
+    tags: ['Fastest Nominal', 'Underpass Warning', 'Congestion Sensitive'],
+    realCoordinates: defaultCorridorCoords.routeA as [number, number][]
   },
   {
     id: 'route-b',
@@ -231,7 +233,8 @@ export const INITIAL_BASE_ROUTES: CandidateRoute[] = [
     ],
     description: 'Dedicated commercial ring road bypass avoiding city bottlenecks. Generous overhead clearance throughout.',
     infrastructureEncountered: ['infra-bridge-2'],
-    tags: ['Clearance Approved', 'High Reliability', 'Recommended']
+    tags: ['Clearance Approved', 'High Reliability', 'Recommended'],
+    realCoordinates: defaultCorridorCoords.routeB as [number, number][]
   },
   {
     id: 'route-c',
@@ -268,6 +271,7 @@ export const INITIAL_BASE_ROUTES: CandidateRoute[] = [
     ],
     description: 'Optimized gradient route minimizing stop-and-go energy loss with continuous steady velocity and weather resilience.',
     infrastructureEncountered: ['infra-bridge-3'],
-    tags: ['Lowest CO₂', 'Weather Resilient', 'Clearance Approved']
+    tags: ['Lowest CO₂', 'Weather Resilient', 'Clearance Approved'],
+    realCoordinates: defaultCorridorCoords.routeB as [number, number][]
   }
 ];

@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { Search, Loader2, Navigation, AlertTriangle, CheckCircle2, RotateCcw, MapPin } from 'lucide-react';
+import { Search, Loader2, Navigation, AlertTriangle, CloudRain, CheckCircle2, RotateCcw, MapPin, Zap } from 'lucide-react';
 import { useCityFlow } from '../../context/CityFlowContext';
+import { CandidateRoute } from '../../types';
 
 interface RealTimeOSMMapProps {
   heightClass?: string;
@@ -12,36 +13,35 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
-  const routeLayerRef = useRef<L.Polyline | null>(null);
+  const routesLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const markersGroupRef = useRef<L.LayerGroup | null>(null);
 
   const {
+    candidateRoutes,
     selectedRoute,
+    setSelectedRoute,
     selectedVehicle,
     startLocation,
     destinationLocation
   } = useCityFlow();
 
-  const [searchQuery, setSearchQuery] = useState('Central Logistics Hub');
+  const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMin: number; source: string } | null>(null);
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMin: number; name: string } | null>(null);
 
-  // Default coordinate center: New Delhi Freight Hub (28.6139, 77.2090)
-  const [currentCenter, setCurrentCenter] = useState<[number, number]>([28.6139, 77.2090]);
-
-  // Initialize Leaflet map
+  // Initialize Leaflet map instance once
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
     if (!mapInstanceRef.current) {
       const map = L.map(mapContainerRef.current, {
-        center: currentCenter,
-        zoom: 13,
+        center: [28.6250, 77.2950],
+        zoom: 12,
         zoomControl: false
       });
 
-      // Crisp OpenStreetMap standard clean tiles (No API key required, 100% clean)
+      // Crisp OpenStreetMap standard clean tiles
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         subdomains: ['a', 'b', 'c'],
@@ -51,8 +51,10 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
       // Add zoom control in bottom right
       L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-      // Create markers layer group
+      // Create separate layer groups for clean batch updates
+      routesLayerGroupRef.current = L.layerGroup().addTo(map);
       markersGroupRef.current = L.layerGroup().addTo(map);
+
       mapInstanceRef.current = map;
     }
 
@@ -64,156 +66,394 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
     };
   }, []);
 
-  // Fetch real-time OSRM driving route when center or selected corridor changes
+  // Multi-route rendering, hazard pins (accident, weather, underpass), and interactive selection
   useEffect(() => {
-    if (!mapInstanceRef.current) return;
+    if (!mapInstanceRef.current || !routesLayerGroupRef.current || !markersGroupRef.current) return;
 
-    const fetchLiveRoute = async () => {
-      // If selectedRoute already has real OSRM coordinates from backend journey API, render directly
-      if (selectedRoute && (selectedRoute as any).realCoordinates && (selectedRoute as any).realCoordinates.length > 0) {
-        const coords = (selectedRoute as any).realCoordinates;
-        const latLngs: L.LatLngExpression[] = coords.map((c: [number, number]) => [c[1], c[0]]);
+    const routesGroup = routesLayerGroupRef.current;
+    const markersGroup = markersGroupRef.current;
 
-        setRouteInfo({
-          distanceKm: selectedRoute.distanceKm,
-          durationMin: selectedRoute.currentEtaMin,
-          source: 'OSRM Live Real-Time Road Geometry'
-        });
+    // Clear previous vector layers and markers cleanly
+    routesGroup.clearLayers();
+    markersGroup.clearLayers();
 
-        if (routeLayerRef.current && mapInstanceRef.current) {
-          mapInstanceRef.current.removeLayer(routeLayerRef.current);
-        }
+    if (!candidateRoutes || candidateRoutes.length === 0) return;
 
-        const isBarred = selectedRoute.clearanceStatus === 'failed';
-        const polyline = L.polyline(latLngs, {
-          color: isBarred ? '#e11d48' : '#166534',
-          weight: 5,
-          opacity: 0.9,
-          lineCap: 'round',
-          lineJoin: 'round'
-        }).addTo(mapInstanceRef.current!);
+    const bounds = L.latLngBounds([]);
 
-        routeLayerRef.current = polyline;
-
-        // Fit map bounds
-        const bounds = L.latLngBounds(latLngs);
-        mapInstanceRef.current!.fitBounds(bounds, { padding: [40, 40] });
-
-        // Update markers
-        if (markersGroupRef.current && latLngs.length > 1) {
-          markersGroupRef.current.clearLayers();
-          const startPt = latLngs[0] as [number, number];
-          const endPt = latLngs[latLngs.length - 1] as [number, number];
-
-          const startIcon = L.divIcon({
-            className: 'custom-div-icon',
-            html: `<div style="background-color: #166534; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">A</div>`,
-            iconSize: [28, 28],
-            iconAnchor: [14, 14]
-          });
-          L.marker(startPt, { icon: startIcon })
-            .bindPopup(`<strong>Origin: ${startLocation || selectedRoute.name}</strong>`)
-            .addTo(markersGroupRef.current);
-
-          const destIcon = L.divIcon({
-            className: 'custom-div-icon',
-            html: `<div style="background-color: #b91c1c; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">B</div>`,
-            iconSize: [28, 28],
-            iconAnchor: [14, 14]
-          });
-          L.marker(endPt, { icon: destIcon })
-            .bindPopup(`<strong>Destination: ${destinationLocation || selectedRoute.corridorName}</strong>`)
-            .addTo(markersGroupRef.current);
-        }
-        return;
+    // Helper: convert [lon, lat] pairs from OSRM coordinates into Leaflet [lat, lon]
+    const extractLatLngs = (route: CandidateRoute): L.LatLngExpression[] => {
+      if (route.realCoordinates && route.realCoordinates.length > 0) {
+        return route.realCoordinates.map(c => [c[1], c[0]]);
       }
-
-      // Calculate realistic destination ~5-8km away based on center
-      const [lat, lon] = currentCenter;
-      const destLat = lat + 0.055;
-      const destLon = lon + 0.045;
-
-      try {
-        const res = await fetch(`/api/map/route?start=${lat},${lon}&end=${destLat},${destLon}`);
-        const data = await res.json();
-
-        if (data.success && data.coordinates && mapInstanceRef.current) {
-          setRouteInfo({
-            distanceKm: data.distanceKm,
-            durationMin: data.durationMin,
-            source: data.source
-          });
-
-          // Convert [lon, lat] to Leaflet [lat, lon]
-          const latLngs: L.LatLngExpression[] = data.coordinates.map((c: [number, number]) => [c[1], c[0]]);
-
-          // Remove old route polyline
-          if (routeLayerRef.current) {
-            mapInstanceRef.current.removeLayer(routeLayerRef.current);
-          }
-
-          // Draw real road route polyline
-          const isBarred = selectedRoute?.clearanceStatus === 'failed';
-          const polyline = L.polyline(latLngs, {
-            color: isBarred ? '#e11d48' : '#166534',
-            weight: 5,
-            opacity: 0.9,
-            lineCap: 'round',
-            lineJoin: 'round'
-          }).addTo(mapInstanceRef.current);
-
-          routeLayerRef.current = polyline;
-
-          // Update markers
-          if (markersGroupRef.current) {
-            markersGroupRef.current.clearLayers();
-
-            // Start Origin Marker (Green)
-            const startIcon = L.divIcon({
-              className: 'custom-div-icon',
-              html: `<div style="background-color: #166534; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">A</div>`,
-              iconSize: [28, 28],
-              iconAnchor: [14, 14]
-            });
-            L.marker([lat, lon], { icon: startIcon })
-              .bindPopup(`<strong>Origin: Dispatch Depot</strong><br>Clearance Approved`)
-              .addTo(markersGroupRef.current);
-
-            // Destination Marker (Blue)
-            const destIcon = L.divIcon({
-              className: 'custom-div-icon',
-              html: `<div style="background-color: #1e3a8a; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">B</div>`,
-              iconSize: [28, 28],
-              iconAnchor: [14, 14]
-            });
-            L.marker([destLat, destLon], { icon: destIcon })
-              .bindPopup(`<strong>Destination: Distribution Center</strong><br>ETA: ${data.durationMin} min (${data.distanceKm} km)`)
-              .addTo(markersGroupRef.current);
-
-            // Midpoint Clearance Underpass Marker
-            const midPoint = latLngs[Math.floor(latLngs.length / 2)] as [number, number];
-            if (midPoint) {
-              const clearanceIcon = L.divIcon({
-                className: 'custom-div-icon',
-                html: `<div style="background-color: ${isBarred ? '#e11d48' : '#d97706'}; color: white; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.25);">▼</div>`,
-                iconSize: [26, 26],
-                iconAnchor: [13, 13]
-              });
-              L.marker(midPoint, { icon: clearanceIcon })
-                .bindPopup(`<strong>Underpass Checkpoint</strong><br>Max Clearance: 3.8m<br>${selectedVehicle ? `Vehicle: ${selectedVehicle.height}m (${selectedVehicle.height > 3.8 ? '⚠️ BARRED' : '✓ CLEAR'})` : ''}`)
-                .addTo(markersGroupRef.current);
-            }
-          }
-
-          mapInstanceRef.current.fitBounds(polyline.getBounds(), { padding: [40, 40] });
-        }
-      } catch (err) {
-        console.warn('Could not fetch real-time route:', err);
-      }
+      return [];
     };
 
-    fetchLiveRoute();
-  }, [currentCenter, selectedRoute, selectedVehicle]);
+    const activeRoute = selectedRoute || candidateRoutes[0];
+    const nonSelectedRoutes = candidateRoutes.filter(r => r.id !== activeRoute.id);
+
+    // 1. RENDER ALTERNATIVE ROUTES FIRST (dimmer blue/slate with interactive click to select)
+    nonSelectedRoutes.forEach((route, idx) => {
+      const latLngs = extractLatLngs(route);
+      if (latLngs.length === 0) return;
+
+      latLngs.forEach(pt => bounds.extend(pt));
+
+      const isBarred = route.clearanceStatus === 'failed';
+      const routeColor = isBarred ? '#f87171' : '#3b82f6';
+
+      // Alternative Polyline
+      const polyline = L.polyline(latLngs, {
+        color: routeColor,
+        weight: 5,
+        opacity: 0.65,
+        dashArray: isBarred ? '8, 8' : undefined,
+        lineCap: 'round',
+        lineJoin: 'round',
+        interactive: true
+      });
+
+      // Hover emphasis
+      polyline.on('mouseover', function (e) {
+        (e.target as L.Polyline).setStyle({ weight: 7, opacity: 0.95 });
+      });
+      polyline.on('mouseout', function (e) {
+        (e.target as L.Polyline).setStyle({ weight: 5, opacity: 0.65 });
+      });
+
+      // User click: switch active route to this candidate!
+      polyline.on('click', () => {
+        setSelectedRoute(route);
+      });
+
+      polyline.bindTooltip(
+        `<div style="font-family: inherit; font-size: 11px; padding: 2px;">
+          <strong style="color: #1d4ed8;">${route.name}</strong><br/>
+          <span>ETA: <b>${route.currentEtaMin} min</b> (${route.distanceKm} km)</span><br/>
+          <span style="color: #2563eb; font-size: 10px; font-weight: bold;">Click route to select</span>
+        </div>`,
+        { sticky: true, direction: 'top' }
+      );
+
+      polyline.addTo(routesGroup);
+
+      // Midpoint ETA Pill for alternative route (Interactive Google Maps style)
+      const fraction = 0.36 + (idx * 0.18);
+      const midIdx = Math.floor(latLngs.length * Math.min(0.72, fraction));
+      const midPoint = latLngs[midIdx] as [number, number];
+
+      if (midPoint) {
+        const altPillIcon = L.divIcon({
+          className: 'route-eta-pill-alt',
+          html: `
+            <div style="
+              background: #1d4ed8;
+              color: #ffffff;
+              padding: 3px 8px;
+              border-radius: 9999px;
+              font-family: inherit;
+              font-size: 11px;
+              font-weight: 700;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+              border: 2px solid #ffffff;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 4px;
+              white-space: nowrap;
+              transition: transform 0.15s ease, background 0.15s ease;
+            " onmouseover="this.style.transform='scale(1.08)'; this.style.background='#1e40af'" onmouseout="this.style.transform='scale(1)'; this.style.background='#1d4ed8'">
+              <span>${route.currentEtaMin} min</span>
+              <span style="font-size: 9px; opacity: 0.85; font-weight: normal;">(${route.distanceKm} km)</span>
+            </div>
+          `,
+          iconSize: [85, 24],
+          iconAnchor: [42, 12]
+        });
+
+        const pillMarker = L.marker(midPoint, { icon: altPillIcon, interactive: true });
+        pillMarker.on('click', () => setSelectedRoute(route));
+        pillMarker.addTo(routesGroup);
+      }
+    });
+
+    // 2. RENDER ACTIVE / OPTIMAL SELECTED ROUTE (Prominently Highlighted with Outer Glow)
+    if (activeRoute) {
+      const activeLatLngs = extractLatLngs(activeRoute);
+      if (activeLatLngs.length > 0) {
+        activeLatLngs.forEach(pt => bounds.extend(pt));
+
+        const isBarred = activeRoute.clearanceStatus === 'failed';
+        const haloColor = isBarred ? '#fb7185' : '#34d399';
+        const coreColor = isBarred ? '#e11d48' : '#15803d';
+
+        // Outer glow halo polyline
+        L.polyline(activeLatLngs, {
+          color: haloColor,
+          weight: 12,
+          opacity: 0.35,
+          lineCap: 'round',
+          lineJoin: 'round',
+          interactive: false
+        }).addTo(routesGroup);
+
+        // Core solid polyline
+        const selPolyline = L.polyline(activeLatLngs, {
+          color: coreColor,
+          weight: 6,
+          opacity: 1.0,
+          lineCap: 'round',
+          lineJoin: 'round',
+          interactive: true
+        }).addTo(routesGroup);
+
+        selPolyline.bindTooltip(
+          `<div style="font-family: inherit; font-size: 11px; padding: 2px;">
+            <strong style="color: ${coreColor};">${activeRoute.name} (SELECTED)</strong><br/>
+            <span>ETA: <b>${activeRoute.currentEtaMin} min</b> (${activeRoute.distanceKm} km)</span><br/>
+            <span>Reliability: <b>${activeRoute.reliabilityScore}%</b> · Safety: <b>${activeRoute.safetyScore}%</b></span>
+          </div>`,
+          { sticky: true, direction: 'top' }
+        );
+
+        // Active Route ETA Pill
+        const activeMidIdx = Math.floor(activeLatLngs.length * 0.52);
+        const activeMidPoint = activeLatLngs[activeMidIdx] as [number, number];
+        if (activeMidPoint) {
+          const activePillIcon = L.divIcon({
+            className: 'route-eta-pill-active',
+            html: `
+              <div style="
+                background: ${isBarred ? '#be123c' : '#166534'};
+                color: #ffffff;
+                padding: 4px 11px;
+                border-radius: 9999px;
+                font-family: inherit;
+                font-size: 11.5px;
+                font-weight: 800;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+                border: 2px solid #ffffff;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                white-space: nowrap;
+              ">
+                <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 6px #4ade80;"></span>
+                <span>${activeRoute.currentEtaMin} min</span>
+                <span style="background: rgba(255,255,255,0.25); padding: 1px 5px; border-radius: 4px; font-size: 9px; font-weight: 700; letter-spacing: 0.5px;">SELECTED</span>
+              </div>
+            `,
+            iconSize: [120, 28],
+            iconAnchor: [60, 14]
+          });
+
+          L.marker(activeMidPoint, { icon: activePillIcon, interactive: false }).addTo(routesGroup);
+        }
+
+        setRouteInfo({
+          distanceKm: activeRoute.distanceKm,
+          durationMin: activeRoute.currentEtaMin,
+          name: activeRoute.name
+        });
+      }
+    }
+
+    // 3. RENDER ORIGIN (A) & DESTINATION (B) PINS
+    const primaryRoute = activeRoute || candidateRoutes[0];
+    const primaryLatLngs = extractLatLngs(primaryRoute);
+
+    if (primaryLatLngs.length > 1) {
+      const originPt = primaryLatLngs[0] as [number, number];
+      const destPt = primaryLatLngs[primaryLatLngs.length - 1] as [number, number];
+
+      // Origin Pin (A)
+      const originIcon = L.divIcon({
+        className: 'origin-marker-icon',
+        html: `
+          <div style="position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+            <div style="position: absolute; width: 34px; height: 34px; border-radius: 50%; background: rgba(22, 101, 52, 0.35); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+            <div style="width: 30px; height: 30px; border-radius: 50%; background: #166534; color: white; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; border: 2.5px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.35);">
+              A
+            </div>
+          </div>
+        `,
+        iconSize: [34, 34],
+        iconAnchor: [17, 17]
+      });
+
+      L.marker(originPt, { icon: originIcon })
+        .bindPopup(`
+          <div style="font-family: inherit; min-width: 190px; padding: 2px;">
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;">
+              <span style="display:inline-block; width: 10px; height: 10px; border-radius: 50%; background: #166534;"></span>
+              <strong style="color: #166534; font-size: 13px;">ORIGIN (START)</strong>
+            </div>
+            <div style="font-size: 11.5px; color: #1e293b; font-weight: 700;">${startLocation || 'Noida Sector 62'}</div>
+            <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Fleet Logistics Hub · Staging Bay #4</div>
+          </div>
+        `)
+        .addTo(markersGroup);
+
+      // Destination Pin (B)
+      const destIcon = L.divIcon({
+        className: 'dest-marker-icon',
+        html: `
+          <div style="position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+            <div style="position: absolute; width: 34px; height: 34px; border-radius: 50%; background: rgba(185, 28, 28, 0.35); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+            <div style="width: 30px; height: 30px; border-radius: 50%; background: #b91c1c; color: white; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; border: 2.5px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.35);">
+              B
+            </div>
+          </div>
+        `,
+        iconSize: [34, 34],
+        iconAnchor: [17, 17]
+      });
+
+      L.marker(destPt, { icon: destIcon })
+        .bindPopup(`
+          <div style="font-family: inherit; min-width: 190px; padding: 2px;">
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;">
+              <span style="display:inline-block; width: 10px; height: 10px; border-radius: 50%; background: #b91c1c;"></span>
+              <strong style="color: #b91c1c; font-size: 13px;">DESTINATION (TARGET)</strong>
+            </div>
+            <div style="font-size: 11.5px; color: #1e293b; font-weight: 700;">${destinationLocation || 'Connaught Place, New Delhi'}</div>
+            <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Central Distribution Point</div>
+          </div>
+        `)
+        .addTo(markersGroup);
+
+      // 4. ACCIDENT / COLLISION HAZARD MARKER (💥)
+      // Placed on the Expressway corridor (Route A) where the severe bottleneck occurs
+      const routeA = candidateRoutes.find(r => r.id === 'route-a') || candidateRoutes[0];
+      const routeALatLngs = extractLatLngs(routeA);
+      const incidentIdx = Math.floor(routeALatLngs.length * 0.38);
+      const incidentCoord = (routeALatLngs[incidentIdx] as [number, number]) || [28.6187, 77.2871];
+
+      const accidentIcon = L.divIcon({
+        className: 'accident-marker-icon',
+        html: `
+          <div style="position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+            <div style="position: absolute; width: 40px; height: 40px; border-radius: 50%; background: rgba(239, 68, 68, 0.45); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: #dc2626; color: white; display: flex; align-items: center; justify-content: center; font-size: 16px; border: 2.5px solid #ffffff; box-shadow: 0 4px 12px rgba(220,38,38,0.5); font-weight: bold; transform: scale(1); transition: transform 0.15s ease;" onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform='scale(1)'">
+              💥
+            </div>
+          </div>
+        `,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20]
+      });
+
+      L.marker(incidentCoord, { icon: accidentIcon })
+        .bindPopup(`
+          <div style="font-family: inherit; min-width: 230px; padding: 4px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; border-bottom: 1px solid #fee2e2; padding-bottom: 5px;">
+              <span style="font-size: 20px;">💥</span>
+              <div>
+                <div style="color: #b91c1c; font-size: 12.5px; font-weight: 800; letter-spacing: 0.3px;">LIVE ACCIDENT / COLLISION</div>
+                <div style="color: #64748b; font-size: 10px;">Expressway A-10 (Km 14.8)</div>
+              </div>
+            </div>
+            <div style="font-size: 11px; color: #334155; line-height: 1.5;">
+              <div><strong>Incident Severity:</strong> <span style="color: #dc2626; font-weight: 700;">2 Right Lanes Blocked</span></div>
+              <div><strong>Bottleneck Delay:</strong> <span style="color: #dc2626; font-weight: 700;">+18 min queue</span></div>
+              <div><strong>Emergency Response:</strong> Tow trucks on site</div>
+            </div>
+            <div style="margin-top: 6px; padding: 6px 8px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; color: #991b1b; font-weight: 600; font-size: 10px; line-height: 1.35;">
+              🛡️ <b>CityFlow AI:</b> Detour via Outer Ring Beltway (Route B) bypasses this crash completely!
+            </div>
+          </div>
+        `)
+        .addTo(markersGroup);
+
+      // 5. WEATHER ADVISORY HAZARD MARKER (🌧️)
+      // Placed in eastern precipitation corridor
+      const weatherIdx = Math.floor(primaryLatLngs.length * 0.68);
+      const weatherCoord = (primaryLatLngs[weatherIdx] as [number, number]) || [28.6255, 77.3125];
+
+      const weatherIcon = L.divIcon({
+        className: 'weather-marker-icon',
+        html: `
+          <div style="position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+            <div style="position: absolute; width: 40px; height: 40px; border-radius: 50%; background: rgba(14, 165, 233, 0.45); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: #0284c7; color: white; display: flex; align-items: center; justify-content: center; font-size: 16px; border: 2.5px solid #ffffff; box-shadow: 0 4px 12px rgba(2,132,199,0.5); transform: scale(1); transition: transform 0.15s ease;" onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform='scale(1)'">
+              🌧️
+            </div>
+          </div>
+        `,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20]
+      });
+
+      L.marker(weatherCoord, { icon: weatherIcon })
+        .bindPopup(`
+          <div style="font-family: inherit; min-width: 230px; padding: 4px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; border-bottom: 1px solid #e0f2fe; padding-bottom: 5px;">
+              <span style="font-size: 20px;">🌧️</span>
+              <div>
+                <div style="color: #0369a1; font-size: 12.5px; font-weight: 800; letter-spacing: 0.3px;">LIVE WEATHER ADVISORY</div>
+                <div style="color: #64748b; font-size: 10px;">East Corridor / Yamuna Floodplain</div>
+              </div>
+            </div>
+            <div style="font-size: 11px; color: #334155; line-height: 1.5;">
+              <div><strong>Condition:</strong> Localized Heavy Downpour</div>
+              <div><strong>Rainfall Rate:</strong> 14.5 mm/h · Visibility: 1.8 km</div>
+              <div><strong>Surface Grip:</strong> Wet Asphalt (Friction μ = 0.42)</div>
+            </div>
+            <div style="margin-top: 6px; padding: 6px 8px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; color: #075985; font-weight: 600; font-size: 10px; line-height: 1.35;">
+              ⚠️ <b>Fleet Safety:</b> Braking distance increased by 35%. Speed advisory restricted to 45 km/h.
+            </div>
+          </div>
+        `)
+        .addTo(markersGroup);
+
+      // 6. LOW CLEARANCE UNDERPASS CHECKPOINT MARKER (🚧)
+      const underpassIdx = Math.floor(routeALatLngs.length * 0.48);
+      const underpassCoord = (routeALatLngs[underpassIdx] as [number, number]) || [28.6211, 77.2850];
+      const isHeightViolated = selectedVehicle ? selectedVehicle.height > 3.8 : true;
+
+      const underpassIcon = L.divIcon({
+        className: 'underpass-marker-icon',
+        html: `
+          <div style="position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+            <div style="width: 30px; height: 30px; border-radius: 8px; background: ${isHeightViolated ? '#dc2626' : '#d97706'}; color: white; display: flex; align-items: center; justify-content: center; font-size: 15px; border: 2px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.35); font-weight: bold; transform: scale(1); transition: transform 0.15s ease;" onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform='scale(1)'">
+              🚧
+            </div>
+          </div>
+        `,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+      });
+
+      L.marker(underpassCoord, { icon: underpassIcon })
+        .bindPopup(`
+          <div style="font-family: inherit; min-width: 220px; padding: 4px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; border-bottom: 1px solid #fed7aa; padding-bottom: 5px;">
+              <span style="font-size: 18px;">🚧</span>
+              <div>
+                <div style="color: ${isHeightViolated ? '#b91c1c' : '#b45309'}; font-size: 12px; font-weight: 800;">METRO RAIL UNDERPASS (A-10)</div>
+                <div style="color: #64748b; font-size: 10px;">Physical Height Constraint</div>
+              </div>
+            </div>
+            <div style="font-size: 11px; color: #334155; line-height: 1.5;">
+              <div><strong>Max Arch Clearance:</strong> 3.80 meters</div>
+              <div><strong>Vehicle Height:</strong> ${selectedVehicle ? selectedVehicle.height : 4.0}m</div>
+            </div>
+            <div style="margin-top: 6px; padding: 6px 8px; background: ${isHeightViolated ? '#fef2f2' : '#f0fdf4'}; border: 1px solid ${isHeightViolated ? '#fecaca' : '#bbf7d0'}; border-radius: 6px; color: ${isHeightViolated ? '#991b1b' : '#166534'}; font-weight: 700; font-size: 10px; line-height: 1.35;">
+              ${isHeightViolated ? '⛔ PHYSICAL CLEARANCE BREACH — ROUTE BARRED' : '✅ CLEARANCE APPROVED — SAFE TRANSIT'}
+            </div>
+          </div>
+        `)
+        .addTo(markersGroup);
+    }
+
+    // Fit map bounds smoothly to fit all candidate routes and markers
+    if (bounds.isValid()) {
+      mapInstanceRef.current.fitBounds(bounds, {
+        padding: [50, 50],
+        maxZoom: 14
+      });
+    }
+  }, [candidateRoutes, selectedRoute, selectedVehicle, startLocation, destinationLocation]);
 
   // Real-time geocoding search handler
   const handleSearch = async (e?: React.FormEvent) => {
@@ -231,11 +471,8 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
         const newLat = parseFloat(top.lat);
         const newLon = parseFloat(top.lon);
 
-        if (!isNaN(newLat) && !isNaN(newLon)) {
-          setCurrentCenter([newLat, newLon]);
-          if (mapInstanceRef.current) {
-            mapInstanceRef.current.flyTo([newLat, newLon], 13, { duration: 1.5 });
-          }
+        if (!isNaN(newLat) && !isNaN(newLon) && mapInstanceRef.current) {
+          mapInstanceRef.current.flyTo([newLat, newLon], 14, { duration: 1.5 });
         }
       }
     } catch (err) {
@@ -249,7 +486,6 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
     const lat = parseFloat(item.lat);
     const lon = parseFloat(item.lon);
     if (!isNaN(lat) && !isNaN(lon)) {
-      setCurrentCenter([lat, lon]);
       setSearchResults([]);
       setSearchQuery(item.display_name.split(',')[0]);
       if (mapInstanceRef.current) {
@@ -259,7 +495,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
   };
 
   return (
-    <div className={`relative isolate z-0 w-full ${heightClass} bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 shadow-sm text-left`}>
+    <div className={`relative isolate z-0 w-full ${heightClass} bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 shadow-sm text-left select-none`}>
       {/* Search Header Bar (Real-Time OSM Geocoding) */}
       <div className="absolute top-3 left-3 right-3 sm:right-auto sm:w-96 z-10">
         <form onSubmit={handleSearch} className="relative flex items-center shadow-md rounded-xl">
@@ -267,7 +503,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search any city or address worldwide..."
+            placeholder="Search address or location worldwide..."
             className="w-full bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl pl-9 pr-20 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#166534] font-medium"
           />
           <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
@@ -306,12 +542,12 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
             <span className="font-bold text-slate-900">{routeInfo.distanceKm} km</span>
           </div>
           <span className="text-slate-300">|</span>
-          <div className="text-slate-600 font-medium">
+          <div className="text-slate-700 font-bold">
             <span>{routeInfo.durationMin} min ETA</span>
           </div>
           <span className="text-slate-300">|</span>
           <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-            LIVE OSRM ROAD TILES
+            GOOGLE-STYLE MULTI-ROUTE
           </span>
         </div>
       )}
@@ -319,19 +555,27 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
       {/* Leaflet Map DOM Container */}
       <div ref={mapContainerRef} className="w-full h-full" style={{ minHeight: '100%' }} />
 
-      {/* Map Legend & Layer Attribution */}
-      <div className="absolute bottom-3 left-3 z-10 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm flex items-center space-x-4 text-[11px] text-slate-700 font-medium pointer-events-auto">
+      {/* Map Interactive Legend */}
+      <div className="absolute bottom-3 left-3 z-10 bg-white/95 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-200 shadow-md flex flex-wrap items-center gap-3.5 text-[11px] text-slate-700 font-semibold pointer-events-auto">
         <div className="flex items-center space-x-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#166534]" />
-          <span>Origin (A)</span>
+          <span className="w-3.5 h-3.5 rounded-full bg-[#166534] border-2 border-white shadow-xs inline-block" />
+          <span>Active Route</span>
         </div>
         <div className="flex items-center space-x-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#1e3a8a]" />
-          <span>Destination (B)</span>
+          <span className="w-3.5 h-3.5 rounded-full bg-[#3b82f6] border-2 border-white shadow-xs inline-block" />
+          <span>Alt Corridor (Click to select)</span>
         </div>
         <div className="flex items-center space-x-1.5">
-          <span className="w-2.5 h-2.5 rounded-sm bg-[#d97706]" />
-          <span>Underpass Check</span>
+          <span className="text-sm leading-none">💥</span>
+          <span>Accident</span>
+        </div>
+        <div className="flex items-center space-x-1.5">
+          <span className="text-sm leading-none">🌧️</span>
+          <span>Weather Alert</span>
+        </div>
+        <div className="flex items-center space-x-1.5">
+          <span className="text-sm leading-none">🚧</span>
+          <span>Underpass (3.8m)</span>
         </div>
       </div>
     </div>

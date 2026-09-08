@@ -120,14 +120,14 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle>(DEFAULT_VEHICLES[0]); // Heavy Delivery Truck
 
   // Planning Form
-  const [startLocation, setStartLocation] = useState<string>('Central Warehouse');
-  const [destinationLocation, setDestinationLocation] = useState<string>('North Distribution Hub');
+  const [startLocation, setStartLocation] = useState<string>('Noida Sector 62');
+  const [destinationLocation, setDestinationLocation] = useState<string>('Connaught Place, New Delhi');
   const [routingMode, setRoutingMode] = useState<RoutingMode>('balanced');
   const [departureTime, setDepartureTime] = useState<string>('Now (10:15 AM)');
 
   // Routes
-  const [candidateRoutes, setCandidateRoutes] = useState<CandidateRoute[]>([]);
-  const [selectedRoute, setSelectedRoute] = useState<CandidateRoute | null>(null);
+  const [candidateRoutes, setCandidateRoutes] = useState<CandidateRoute[]>(INITIAL_BASE_ROUTES);
+  const [selectedRoute, setSelectedRoute] = useState<CandidateRoute | null>(INITIAL_BASE_ROUTES[1]);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [analysisStage, setAnalysisStage] = useState<number>(0);
 

@@ -21,11 +21,13 @@ import { GoogleFleetMap } from './GoogleFleetMap';
 interface CityMapProps {
   heightClass?: string;
   showControls?: boolean;
+  showJourneyRoutes?: boolean;
 }
 
 export const CityMap: React.FC<CityMapProps> = ({
   heightClass = 'h-[520px]',
-  showControls = true
+  showControls = true,
+  showJourneyRoutes = false
 }) => {
   const {
     cityZones,
@@ -38,7 +40,7 @@ export const CityMap: React.FC<CityMapProps> = ({
     liveTrafficEnabled
   } = useCityFlow();
 
-  const [mapMode, setMapMode] = useState<'google' | 'osm' | 'blueprint'>('google');
+  const [mapMode, setMapMode] = useState<'google' | 'osm' | 'blueprint'>('osm');
   const [zoom, setZoom] = useState(1.0);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [activeLayers, setActiveLayers] = useState({
@@ -112,9 +114,9 @@ export const CityMap: React.FC<CityMapProps> = ({
       </div>
 
       {mapMode === 'google' ? (
-        <GoogleFleetMap heightClass={heightClass} />
+        <GoogleFleetMap heightClass={heightClass} showJourneyRoutes={showJourneyRoutes} />
       ) : mapMode === 'osm' ? (
-        <RealTimeOSMMap heightClass={heightClass} />
+        <RealTimeOSMMap heightClass={heightClass} showJourneyRoutes={showJourneyRoutes} />
       ) : (
         <>
           {/* Background Urban Blueprint SVG */}

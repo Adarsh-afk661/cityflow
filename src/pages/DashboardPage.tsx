@@ -111,7 +111,7 @@ export const DashboardPage: React.FC = () => {
             Click pressure zones or vehicles to inspect live telemetry
           </div>
         </div>
-        <CityMap heightClass="h-[520px]" showControls={true} />
+        <CityMap heightClass="h-[520px]" showControls={true} showJourneyRoutes={false} />
       </div>
 
       {/* Bottom 3-Column Intelligence Grid */}

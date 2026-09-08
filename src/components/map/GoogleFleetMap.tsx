@@ -20,6 +20,7 @@ declare const google: any;
 
 interface GoogleFleetMapProps {
   heightClass?: string;
+  showJourneyRoutes?: boolean;
 }
 
 // Professional Dark Fleet Command-Center Style
@@ -90,7 +91,8 @@ const DARK_FLEET_MAP_STYLES = [
 ];
 
 export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
-  heightClass = 'h-[540px]'
+  heightClass = 'h-[540px]',
+  showJourneyRoutes = true
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -400,7 +402,7 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
   if (mapError || !googleApiKey) {
     return (
       <div className="relative w-full h-full text-left">
-        <RealTimeOSMMap heightClass="h-full" />
+        <RealTimeOSMMap heightClass="h-full" showJourneyRoutes={showJourneyRoutes} />
       </div>
     );
   }

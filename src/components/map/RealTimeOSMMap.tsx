@@ -1,15 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { Search, Loader2, Navigation, AlertTriangle, CloudRain, CheckCircle2, RotateCcw, MapPin, Zap } from 'lucide-react';
+import { Search, Loader2, Navigation, AlertTriangle, CloudRain, CheckCircle2, RotateCcw, MapPin, Zap, Truck, Radio } from 'lucide-react';
 import { useCityFlow } from '../../context/CityFlowContext';
 import { CandidateRoute } from '../../types';
 
 interface RealTimeOSMMapProps {
   heightClass?: string;
+  showJourneyRoutes?: boolean;
 }
 
 export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
-  heightClass = 'h-[520px]'
+  heightClass = 'h-[520px]',
+  showJourneyRoutes = true
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -22,7 +24,9 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
     setSelectedRoute,
     selectedVehicle,
     startLocation,
-    destinationLocation
+    destinationLocation,
+    fleet,
+    cityZones
   } = useCityFlow();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -66,7 +70,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
     };
   }, []);
 
-  // Multi-route rendering, hazard pins (accident, weather, underpass), and interactive selection
+  // Map rendering effect: handles both Command Center Digital Twin Mode & RouteShield Journey Mode
   useEffect(() => {
     if (!mapInstanceRef.current || !routesLayerGroupRef.current || !markersGroupRef.current) return;
 
@@ -77,9 +81,153 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
     routesGroup.clearLayers();
     markersGroup.clearLayers();
 
-    if (!candidateRoutes || candidateRoutes.length === 0) return;
-
     const bounds = L.latLngBounds([]);
+
+    // =========================================================================
+    // CASE A: DASHBOARD MODE (showJourneyRoutes === false)
+    // Display Metropolitan Mobility Digital Twin: Active fleet units, city zones,
+    // and live regional traffic incidents WITHOUT arbitrary journey route lines.
+    // =========================================================================
+    if (!showJourneyRoutes) {
+      // 1. Render City Traffic Pressure Zones
+      if (cityZones && cityZones.length > 0) {
+        cityZones.forEach(zone => {
+          // Approximate Delhi-NCR coordinates for zones
+          const centerLat = 28.6139 + (zone.center.y - 300) * 0.0007;
+          const centerLon = 77.2400 + (zone.center.x - 450) * 0.0007;
+
+          const zoneColor =
+            zone.status === 'severe'
+              ? '#ef4444'
+              : zone.status === 'heavy'
+              ? '#f59e0b'
+              : zone.status === 'moderate'
+              ? '#3b82f6'
+              : '#10b981';
+
+          const circle = L.circle([centerLat, centerLon], {
+            radius: 1800,
+            color: zoneColor,
+            fillColor: zoneColor,
+            fillOpacity: 0.14,
+            weight: 1.5
+          }).addTo(routesGroup);
+
+          circle.bindPopup(`
+            <div style="font-family: inherit; min-width: 170px; padding: 2px;">
+              <strong style="color: ${zoneColor}; font-size: 12.5px;">${zone.name}</strong><br/>
+              <div style="font-size: 11px; color: #334155; margin-top: 3px;">
+                <span>Pressure Score: <b>${zone.pressureScore}/100</b></span><br/>
+                <span>Flow Status: <b style="text-transform: uppercase;">${zone.status}</b></span><br/>
+                <span>Average Speed: <b>${zone.avgSpeedKmh} km/h</b></span><br/>
+                <span>Active Incidents: <b>${zone.activeIncidents}</b></span>
+              </div>
+            </div>
+          `);
+
+          bounds.extend([centerLat, centerLon]);
+        });
+      }
+
+      // 2. Render Active Commercial Fleet Vehicles Moving on Grid
+      if (fleet && fleet.length > 0) {
+        fleet.forEach(veh => {
+          // Distribute fleet units across real metropolitan road grid
+          const vehLat = 28.6139 + (veh.coordinates.y - 300) * 0.00065;
+          const vehLon = 77.2500 + (veh.coordinates.x - 450) * 0.00065;
+
+          const isDelayed = veh.status === 'delayed';
+          const badgeBg = isDelayed ? '#ef4444' : '#166534';
+
+          const fleetIcon = L.divIcon({
+            className: 'fleet-vehicle-icon',
+            html: `
+              <div style="
+                background: ${badgeBg};
+                color: #ffffff;
+                padding: 2px 7px;
+                border-radius: 6px;
+                font-family: inherit;
+                font-size: 10px;
+                font-weight: 700;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                border: 1.5px solid #ffffff;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                white-space: nowrap;
+                cursor: pointer;
+                transition: transform 0.15s ease;
+              " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+                <span>${veh.type === 'truck' ? '🚚' : '🚐'}</span>
+                <span>${veh.id}</span>
+                <span style="opacity: 0.85; font-size: 9px;">${veh.speedKmh}k</span>
+              </div>
+            `,
+            iconSize: [85, 22],
+            iconAnchor: [42, 11]
+          });
+
+          L.marker([vehLat, vehLon], { icon: fleetIcon })
+            .bindPopup(`
+              <div style="font-family: inherit; min-width: 180px; padding: 2px;">
+                <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 3px;">
+                  <span style="font-size: 14px;">🚚</span>
+                  <strong style="color: ${badgeBg}; font-size: 12px;">Fleet Unit ${veh.id}</strong>
+                </div>
+                <div style="font-size: 11px; color: #334155; line-height: 1.45;">
+                  <div>Driver: <b>${veh.driver}</b></div>
+                  <div>Assigned: <b>${veh.currentRouteName}</b></div>
+                  <div>Speed: <b>${veh.speedKmh} km/h</b> · Height: <b>${veh.vehicleSpecs.height}m</b></div>
+                  <div>Status: <b style="color: ${badgeBg}; text-transform: uppercase;">${veh.status}</b></div>
+                </div>
+              </div>
+            `)
+            .addTo(markersGroup);
+
+          bounds.extend([vehLat, vehLon]);
+        });
+      }
+
+      // 3. Regional Incidents Hotspots (Accident & Weather on Grid)
+      const accidentPt: [number, number] = [28.6187, 77.2871];
+      const accidentIcon = L.divIcon({
+        className: 'accident-marker-icon',
+        html: `
+          <div style="position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+            <div style="position: absolute; width: 36px; height: 36px; border-radius: 50%; background: rgba(239, 68, 68, 0.45); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+            <div style="width: 28px; height: 28px; border-radius: 50%; background: #dc2626; color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 2px solid #ffffff; box-shadow: 0 3px 8px rgba(0,0,0,0.35);">
+              💥
+            </div>
+          </div>
+        `,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18]
+      });
+
+      L.marker(accidentPt, { icon: accidentIcon })
+        .bindPopup(`
+          <div style="font-family: inherit; min-width: 210px; padding: 2px;">
+            <strong style="color: #b91c1c; font-size: 12px;">💥 ARTERIAL INCIDENT — 2 LANES BLOCKED</strong><br/>
+            <span style="font-size: 11px; color: #334155;">Expressway A-10 Link · Bottleneck Delay +18 min</span>
+          </div>
+        `)
+        .addTo(markersGroup);
+
+      setRouteInfo(null);
+
+      if (bounds.isValid()) {
+        mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
+      }
+      return;
+    }
+
+    // =========================================================================
+    // CASE B: ROUTESHIELD JOURNEY MODE (showJourneyRoutes === true)
+    // Display planned candidate routes with real distance, duration, hazard markers,
+    // and interactive Google Maps-style route selection.
+    // =========================================================================
+    if (!candidateRoutes || candidateRoutes.length === 0) return;
 
     // Helper: convert [lon, lat] pairs from OSRM coordinates into Leaflet [lat, lon]
     const extractLatLngs = (route: CandidateRoute): L.LatLngExpression[] => {
@@ -92,7 +240,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
     const activeRoute = selectedRoute || candidateRoutes[0];
     const nonSelectedRoutes = candidateRoutes.filter(r => r.id !== activeRoute.id);
 
-    // 1. RENDER ALTERNATIVE ROUTES FIRST (dimmer blue/slate with interactive click to select)
+    // 1. RENDER ALTERNATIVE ROUTES FIRST (dimmer blue with interactive click to select)
     nonSelectedRoutes.forEach((route, idx) => {
       const latLngs = extractLatLngs(route);
       if (latLngs.length === 0) return;
@@ -240,11 +388,12 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
               ">
                 <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 6px #4ade80;"></span>
                 <span>${activeRoute.currentEtaMin} min</span>
+                <span style="font-size: 9.5px; opacity: 0.9;">(${activeRoute.distanceKm} km)</span>
                 <span style="background: rgba(255,255,255,0.25); padding: 1px 5px; border-radius: 4px; font-size: 9px; font-weight: 700; letter-spacing: 0.5px;">SELECTED</span>
               </div>
             `,
-            iconSize: [120, 28],
-            iconAnchor: [60, 14]
+            iconSize: [140, 28],
+            iconAnchor: [70, 14]
           });
 
           L.marker(activeMidPoint, { icon: activePillIcon, interactive: false }).addTo(routesGroup);
@@ -453,7 +602,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
         maxZoom: 14
       });
     }
-  }, [candidateRoutes, selectedRoute, selectedVehicle, startLocation, destinationLocation]);
+  }, [showJourneyRoutes, candidateRoutes, selectedRoute, selectedVehicle, startLocation, destinationLocation, fleet, cityZones]);
 
   // Real-time geocoding search handler
   const handleSearch = async (e?: React.FormEvent) => {
@@ -535,7 +684,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
       </div>
 
       {/* Live Route Telemetry HUD Pill */}
-      {routeInfo && (
+      {showJourneyRoutes && routeInfo && (
         <div className="absolute top-14 right-3 z-10 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-slate-200 shadow-md flex items-center space-x-3 text-xs">
           <div className="flex items-center space-x-1.5">
             <Navigation className="w-3.5 h-3.5 text-[#166534]" />
@@ -552,31 +701,63 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
         </div>
       )}
 
+      {!showJourneyRoutes && (
+        <div className="absolute top-14 right-3 z-10 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-slate-200 shadow-md flex items-center space-x-2 text-xs">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="font-mono font-bold text-slate-900 text-[11px]">METROPOLITAN DIGITAL TWIN</span>
+          <span className="text-slate-300">|</span>
+          <span className="text-slate-600 text-[11px] font-medium">{fleet?.length || 24} Units Live</span>
+        </div>
+      )}
+
       {/* Leaflet Map DOM Container */}
       <div ref={mapContainerRef} className="w-full h-full" style={{ minHeight: '100%' }} />
 
       {/* Map Interactive Legend */}
       <div className="absolute bottom-3 left-3 z-10 bg-white/95 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-200 shadow-md flex flex-wrap items-center gap-3.5 text-[11px] text-slate-700 font-semibold pointer-events-auto">
-        <div className="flex items-center space-x-1.5">
-          <span className="w-3.5 h-3.5 rounded-full bg-[#166534] border-2 border-white shadow-xs inline-block" />
-          <span>Active Route</span>
-        </div>
-        <div className="flex items-center space-x-1.5">
-          <span className="w-3.5 h-3.5 rounded-full bg-[#3b82f6] border-2 border-white shadow-xs inline-block" />
-          <span>Alt Corridor (Click to select)</span>
-        </div>
-        <div className="flex items-center space-x-1.5">
-          <span className="text-sm leading-none">💥</span>
-          <span>Accident</span>
-        </div>
-        <div className="flex items-center space-x-1.5">
-          <span className="text-sm leading-none">🌧️</span>
-          <span>Weather Alert</span>
-        </div>
-        <div className="flex items-center space-x-1.5">
-          <span className="text-sm leading-none">🚧</span>
-          <span>Underpass (3.8m)</span>
-        </div>
+        {showJourneyRoutes ? (
+          <>
+            <div className="flex items-center space-x-1.5">
+              <span className="w-3.5 h-3.5 rounded-full bg-[#166534] border-2 border-white shadow-xs inline-block" />
+              <span>Active Route</span>
+            </div>
+            <div className="flex items-center space-x-1.5">
+              <span className="w-3.5 h-3.5 rounded-full bg-[#3b82f6] border-2 border-white shadow-xs inline-block" />
+              <span>Alt Corridor (Click to select)</span>
+            </div>
+            <div className="flex items-center space-x-1.5">
+              <span className="text-sm leading-none">💥</span>
+              <span>Accident</span>
+            </div>
+            <div className="flex items-center space-x-1.5">
+              <span className="text-sm leading-none">🌧️</span>
+              <span>Weather Alert</span>
+            </div>
+            <div className="flex items-center space-x-1.5">
+              <span className="text-sm leading-none">🚧</span>
+              <span>Underpass (3.8m)</span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center space-x-1.5">
+              <span className="w-3.5 h-3.5 rounded-sm bg-[#166534] inline-block" />
+              <span>Commercial Fleet Unit</span>
+            </div>
+            <div className="flex items-center space-x-1.5">
+              <span className="w-3.5 h-3.5 rounded-sm bg-[#ef4444] inline-block" />
+              <span>Delayed Unit</span>
+            </div>
+            <div className="flex items-center space-x-1.5">
+              <span className="w-3.5 h-3.5 rounded-full bg-emerald-400 opacity-60 inline-block" />
+              <span>Traffic Zone</span>
+            </div>
+            <div className="flex items-center space-x-1.5">
+              <span className="text-sm leading-none">💥</span>
+              <span>Regional Bottleneck</span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

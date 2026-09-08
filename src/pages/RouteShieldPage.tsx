@@ -215,7 +215,7 @@ export const RouteShieldPage: React.FC = () => {
               </span>
             )}
           </div>
-          <CityMap heightClass="h-[460px]" showControls={false} />
+          <CityMap heightClass="h-[460px]" showControls={false} showJourneyRoutes={true} />
 
           {/* Selected Route Quick Telemetry bar */}
           {selectedRoute && (

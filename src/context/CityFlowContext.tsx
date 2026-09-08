@@ -66,7 +66,7 @@ interface CityFlowContextType {
   setSelectedRoute: (route: CandidateRoute | null) => void;
   isAnalyzing: boolean;
   analysisStage: number;
-  runRouteAnalysis: () => Promise<void>;
+  runRouteAnalysis: (startOverride?: string, destOverride?: string) => Promise<void>;
 
   // Live Traffic & System
   liveTrafficEnabled: boolean;
@@ -190,15 +190,64 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [demoStep, setDemoStep] = useState<number>(0);
   const [demoFinalModalOpen, setDemoFinalModalOpen] = useState<boolean>(false);
 
-  // Helper function to evaluate routes for a given vehicle and mode
-  const evaluateRoutes = (veh: Vehicle, mode: RoutingMode): CandidateRoute[] => {
+  const getCorridorMetrics = (start: string, dest: string) => {
+    const s = (start || '').toLowerCase();
+    const d = (dest || '').toLowerCase();
+
+    if (s.includes('greater noida') || d.includes('greater noida')) {
+      return {
+        'route-a': { dist: 51.8, dur: 64, name: 'NOIDA-GR NOIDA EXPWY & DND', summary: 'Direct corridor via Noida-Gr Noida Expy & Outer Ring' },
+        'route-b': { dist: 58.4, dur: 59, name: 'EASTERN PERIPHERAL BYPASS', summary: 'Commercial bypass via EPE with 5.0m clearance' },
+        'route-c': { dist: 54.2, dur: 68, name: 'YAMUNA EXPWY CONNECTOR', summary: 'High-speed corridor with steady gradient flow' }
+      };
+    }
+    if (s.includes('cyber city') || s.includes('gurugram') || d.includes('cyber city') || d.includes('gurugram')) {
+      return {
+        'route-a': { dist: 27.6, dur: 42, name: 'DELHI-GURGAON EXPWY (NH48)', summary: 'Direct NH48 arterial into Central Delhi' },
+        'route-b': { dist: 31.2, dur: 48, name: 'MG ROAD & SOUTH RING BYPASS', summary: 'High-clearance boulevard avoiding arterial bottlenecks' },
+        'route-c': { dist: 29.5, dur: 45, name: 'MEHRAULI ARTERIAL VIADUCT', summary: 'Steady elevated corridor through South Delhi' }
+      };
+    }
+    if ((s.includes('noida') && (d.includes('airport') || d.includes('delhi airport'))) || ((s.includes('airport') || s.includes('delhi airport')) && d.includes('noida'))) {
+      return {
+        'route-a': { dist: 36.8, dur: 48, name: 'NH9 & BARAPULLAH ELEVATED', summary: 'Elevated highway link directly to Airport Approach' },
+        'route-b': { dist: 39.4, dur: 52, name: 'DND FLYWAY & OUTER RING ROAD', summary: 'Commercial corridor bypassing urban core intersections' },
+        'route-c': { dist: 41.2, dur: 56, name: 'KALINDI KUNJ GREEN LINK', summary: 'Southern perimeter route with full height clearance' }
+      };
+    }
+    // Default: Noida Sector 62 -> Connaught Place, New Delhi
+    return {
+      'route-a': { dist: 19.8, dur: 22, name: 'NH9 ARTERIAL & VIKAS MARG', summary: 'Direct NH9 corridor via Vikas Marg (3.8m Metro Arch)' },
+      'route-b': { dist: 22.3, dur: 25, name: 'OUTER RING BELTWAY & FLYOVER', summary: 'Commercial ring bypass with 4.8m overhead clearance' },
+      'route-c': { dist: 24.2, dur: 28, name: 'ECO-FLOW PARKWAY & VIADUCT', summary: 'Elevated green viaduct minimizing stop-and-go delays' }
+    };
+  };
+
+  // Helper function to evaluate routes for a given vehicle, mode, and corridor
+  const evaluateRoutes = (
+    veh: Vehicle,
+    mode: RoutingMode,
+    startLoc: string = startLocation,
+    destLoc: string = destinationLocation
+  ): CandidateRoute[] => {
+    const metrics = getCorridorMetrics(startLoc, destLoc);
+
     const rawRoutes = INITIAL_BASE_ROUTES.map(baseRoute => {
+      const m = metrics[baseRoute.id as keyof typeof metrics] || {
+        dist: baseRoute.distanceKm,
+        dur: baseRoute.baseDurationMin,
+        name: baseRoute.corridorName,
+        summary: baseRoute.description
+      };
+      const effectiveDist = m.dist;
+      const effectiveBaseDur = m.dur;
+
       // 1. Physical Clearance Validation
       const clearanceEval = evaluateRouteClearance(veh, baseRoute.infrastructureEncountered);
 
       // 2. Predictive Reliability
       const reliability = predictJourneyReliability({
-        baseDurationMin: baseRoute.baseDurationMin,
+        baseDurationMin: effectiveBaseDur,
         trafficLevel: baseRoute.trafficLevel,
         vehicle: veh,
         incidentCount: baseRoute.id === 'route-a' ? 1 : 0
@@ -215,13 +264,15 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
 
       // 4. Emissions
       const emissions = calculateEmissions({
-        distanceKm: baseRoute.distanceKm,
+        distanceKm: effectiveDist,
         vehicle: veh,
         trafficLevel: baseRoute.trafficLevel
       });
 
       return {
         ...baseRoute,
+        distanceKm: effectiveDist,
+        baseDurationMin: effectiveBaseDur,
         currentEtaMin: reliability.predictedEtaMin,
         predictedTimeRange: reliability.predictedTimeRange,
         reliabilityScore: reliability.reliabilityScore,
@@ -240,7 +291,7 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   // Run initial evaluation on mount
   useEffect(() => {
-    const evaluated = evaluateRoutes(selectedVehicle, routingMode);
+    const evaluated = evaluateRoutes(selectedVehicle, routingMode, startLocation, destinationLocation);
     setCandidateRoutes(evaluated);
     const recommended = evaluated.find(r => r.isRecommended) || evaluated[1] || evaluated[0];
     setSelectedRoute(recommended);
@@ -287,14 +338,20 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, [liveTrafficEnabled]);
 
   // Route Analysis animated workflow (7 stages)
-  const runRouteAnalysis = async (): Promise<void> => {
+  const runRouteAnalysis = async (startOverride?: string, destOverride?: string): Promise<void> => {
+    const startTarget = startOverride || startLocation;
+    const destTarget = destOverride || destinationLocation;
+
+    if (startOverride) setStartLocation(startOverride);
+    if (destOverride) setDestinationLocation(destOverride);
+
     setIsAnalyzing(true);
     setAnalysisStage(0);
 
     // 7-stage animated pipeline
     for (let step = 0; step < 7; step++) {
       setAnalysisStage(step);
-      await new Promise(resolve => setTimeout(resolve, 220));
+      await new Promise(resolve => setTimeout(resolve, 180));
     }
 
     try {
@@ -302,8 +359,8 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          start: startLocation,
-          destination: destinationLocation,
+          start: startTarget,
+          destination: destTarget,
           vehicle: selectedVehicle,
           routingMode
         })
@@ -327,7 +384,7 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
 
     // Offline / Network Degradation Fallback
-    const calculated = evaluateRoutes(selectedVehicle, routingMode);
+    const calculated = evaluateRoutes(selectedVehicle, routingMode, startTarget, destTarget);
     setCandidateRoutes(calculated);
     const topFeasible = calculated.find(r => r.isRecommended) || calculated.find(r => r.clearanceStatus === 'approved') || calculated[0];
     setSelectedRoute(topFeasible);

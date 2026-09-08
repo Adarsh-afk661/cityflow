@@ -157,6 +157,7 @@ export const RoutePlanner: React.FC = () => {
               setDestinationLocation(preset.dest);
               setDestQuery(preset.dest);
               setActiveDropdown(null);
+              runRouteAnalysis(preset.start, preset.dest);
             }}
             className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 hover:text-[#166534] font-medium text-[11px] transition cursor-pointer"
           >

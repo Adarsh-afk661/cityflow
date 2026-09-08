@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { getDBStatus } from '../config/db.js';
 import { VehicleModel } from '../models/Vehicle.js';
 import { RouteModel } from '../models/RouteModel.js';
@@ -15,7 +15,7 @@ let inMemoryAlerts = [...REAL_ALERTS];
 let inMemoryDemoLeads: any[] = [];
 
 // Health Check
-router.get('/health', (req, res) => {
+router.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'online',
     timestamp: new Date().toISOString(),
@@ -25,7 +25,7 @@ router.get('/health', (req, res) => {
 });
 
 // Detailed Database Status & Counts
-router.get('/db-status', async (req, res) => {
+router.get('/db-status', async (req: Request, res: Response) => {
   const dbStatus = getDBStatus();
   let counts = {
     vehicles: inMemoryVehicles.length,
@@ -55,7 +55,7 @@ router.get('/db-status', async (req, res) => {
 });
 
 // Seed Real Data Endpoint
-router.post('/seed', async (req, res) => {
+router.post('/seed', async (req: Request, res: Response) => {
   try {
     const result = await seedDatabase();
     // Also update in-memory arrays so both are in sync
@@ -86,7 +86,7 @@ router.post('/seed', async (req, res) => {
 });
 
 // Vehicles CRUD
-router.get('/vehicles', async (req, res) => {
+router.get('/vehicles', async (req: Request, res: Response) => {
   const dbStatus = getDBStatus();
   if (dbStatus.connected) {
     try {
@@ -99,7 +99,7 @@ router.get('/vehicles', async (req, res) => {
   res.json(inMemoryVehicles);
 });
 
-router.post('/vehicles', async (req, res) => {
+router.post('/vehicles', async (req: Request, res: Response) => {
   const { name, type, height, width, length, weight, fuelType } = req.body;
   const newVeh = {
     id: `custom-${Date.now()}`,
@@ -128,7 +128,7 @@ router.post('/vehicles', async (req, res) => {
   res.status(201).json(newVeh);
 });
 
-router.delete('/vehicles/:id', async (req, res) => {
+router.delete('/vehicles/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
   const dbStatus = getDBStatus();
   if (dbStatus.connected) {
@@ -143,7 +143,7 @@ router.delete('/vehicles/:id', async (req, res) => {
 });
 
 // Freight Corridors / Routes
-router.get('/routes', async (req, res) => {
+router.get('/routes', async (req: Request, res: Response) => {
   const dbStatus = getDBStatus();
   if (dbStatus.connected) {
     try {
@@ -157,7 +157,7 @@ router.get('/routes', async (req, res) => {
 });
 
 // Demo Lead Registration (Stores in MongoDB)
-router.post('/demo-lead', async (req, res) => {
+router.post('/demo-lead', async (req: Request, res: Response) => {
   const { name, email, company, fleetSize } = req.body;
   const leadData = {
     name,
@@ -181,7 +181,7 @@ router.post('/demo-lead', async (req, res) => {
   res.status(201).json({ success: true, lead: leadData, storage: 'In-Memory Fallback' });
 });
 
-router.get('/demo-leads', async (req, res) => {
+router.get('/demo-leads', async (req: Request, res: Response) => {
   const dbStatus = getDBStatus();
   if (dbStatus.connected) {
     try {
@@ -193,7 +193,7 @@ router.get('/demo-leads', async (req, res) => {
 });
 
 // Real-Time OpenStreetMap Geocoding API
-router.get('/map/geocode', async (req, res) => {
+router.get('/map/geocode', async (req: Request, res: Response) => {
   const query = req.query.q as string;
   if (!query) return res.status(400).json({ error: 'Query parameter "q" required' });
 
@@ -223,7 +223,7 @@ router.get('/map/geocode', async (req, res) => {
 });
 
 // Real-Time Driving Route API (OSRM Open Source Routing Machine)
-router.get('/map/route', async (req, res) => {
+router.get('/map/route', async (req: Request, res: Response) => {
   const { start, end } = req.query; // format: "lat,lon"
   if (!start || !end) {
     return res.status(400).json({ error: 'Start and end coordinates required (format: lat,lon)' });
@@ -274,7 +274,7 @@ router.get('/map/route', async (req, res) => {
 });
 
 // Route Analysis & Clearance Enforcement
-router.post('/routes/analyze', (req, res) => {
+router.post('/routes/analyze', (req: Request, res: Response) => {
   const { vehicle, mode = 'balanced' } = req.body;
   const vehicleHeight = vehicle?.height || 4.1;
   const vehicleWeight = vehicle?.weight || 16.0;

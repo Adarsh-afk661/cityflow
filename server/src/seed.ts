@@ -1,3 +1,4 @@
+import process from 'node:process';
 import { connectDatabase } from './config/db.js';
 import { VehicleModel } from './models/Vehicle.js';
 import { RouteModel } from './models/RouteModel.js';

@@ -1,0 +1,17 @@
+services:
+  # CityFlow Express + MongoDB Backend API
+  - type: web
+    name: cityflow-backend
+    env: node
+    rootDir: server
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: PORT
+        value: 5000
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false # Set your MongoDB Atlas connection string here
+

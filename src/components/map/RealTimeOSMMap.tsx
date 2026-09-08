@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { Search, Loader2, Navigation, AlertTriangle, CloudRain, CheckCircle2, RotateCcw, MapPin, Zap, Truck, Radio } from 'lucide-react';
+import { Search, Loader2, Navigation, MapPin } from 'lucide-react';
 import { useCityFlow } from '../../context/CityFlowContext';
 import { CandidateRoute } from '../../types';
 
@@ -602,7 +602,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
         maxZoom: 14
       });
     }
-  }, [showJourneyRoutes, candidateRoutes, selectedRoute, selectedVehicle, startLocation, destinationLocation, fleet, cityZones]);
+  }, [showJourneyRoutes, candidateRoutes, selectedRoute, selectedVehicle, startLocation, destinationLocation, fleet, cityZones, setSelectedRoute]);
 
   // Real-time geocoding search handler
   const handleSearch = async (e?: React.FormEvent) => {

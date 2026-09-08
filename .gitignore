@@ -12,7 +12,7 @@ dist
 dist-ssr
 *.local
 .env
-.env.*
+.env.*\n!.env.example
 server/node_modules
 server/dist
 

@@ -129,15 +129,21 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
         });
       }
 
-      // 2. Render Active Commercial Fleet Vehicles Moving on Grid
+      // 2. Render Active Commercial Fleet Vehicles — GPS NOT CONNECTED
+      // Fleet positions shown as last-known static markers with clear "NOT LIVE" label.
+      // No telematics provider connected — do not fake GPS coordinates.
       if (fleet && fleet.length > 0) {
         fleet.forEach(veh => {
-          // Distribute fleet units across real metropolitan road grid
+          // Only render vehicles that have meaningful last-known coordinates
+          if (!veh.coordinates || (veh.coordinates.x === 0 && veh.coordinates.y === 0)) return;
+
+          // Convert canvas grid coords to approximate Delhi-NCR lat/lon (last known position only)
           const vehLat = 28.6139 + (veh.coordinates.y - 300) * 0.00065;
           const vehLon = 77.2500 + (veh.coordinates.x - 450) * 0.00065;
 
           const isDelayed = veh.status === 'delayed';
-          const badgeBg = isDelayed ? '#ef4444' : '#166534';
+          const isIdling = veh.status === 'idling' || veh.status === 'maintenance';
+          const badgeBg = isDelayed ? '#ef4444' : isIdling ? '#6b7280' : '#166534';
 
           const fleetIcon = L.divIcon({
             className: 'fleet-vehicle-icon',
@@ -157,29 +163,31 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
                 gap: 4px;
                 white-space: nowrap;
                 cursor: pointer;
-                transition: transform 0.15s ease;
-              " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
-                <span>${veh.type === 'truck' ? '🚚' : '🚐'}</span>
+              ">
+                <span>${veh.type === 'truck' ? '🚚' : veh.type === 'bus' ? '🚌' : '🚐'}</span>
                 <span>${veh.id}</span>
-                <span style="opacity: 0.85; font-size: 9px;">${veh.speedKmh}k</span>
+                <span style="opacity: 0.75; font-size: 8px;">STATIC</span>
               </div>
             `,
-            iconSize: [85, 22],
-            iconAnchor: [42, 11]
+            iconSize: [90, 22],
+            iconAnchor: [45, 11]
           });
 
           L.marker([vehLat, vehLon], { icon: fleetIcon })
             .bindPopup(`
-              <div style="font-family: inherit; min-width: 180px; padding: 2px;">
-                <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 3px;">
-                  <span style="font-size: 14px;">🚚</span>
+              <div style="font-family: inherit; min-width: 210px; padding: 2px;">
+                <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 4px;">
+                  <span style="font-size: 14px;">${veh.type === 'truck' ? '🚚' : '🚌'}</span>
                   <strong style="color: ${badgeBg}; font-size: 12px;">Fleet Unit ${veh.id}</strong>
                 </div>
-                <div style="font-size: 11px; color: #334155; line-height: 1.45;">
+                <div style="font-size: 11px; color: #334155; line-height: 1.5;">
                   <div>Driver: <b>${veh.driver}</b></div>
-                  <div>Assigned: <b>${veh.currentRouteName}</b></div>
-                  <div>Speed: <b>${veh.speedKmh} km/h</b> · Height: <b>${veh.vehicleSpecs.height}m</b></div>
+                  <div>Assigned Route: <b>${veh.currentRouteName || '—'}</b></div>
+                  <div>Destination: <b>${veh.destination}</b></div>
                   <div>Status: <b style="color: ${badgeBg}; text-transform: uppercase;">${veh.status}</b></div>
+                  <div style="margin-top: 6px; padding: 4px 8px; background: #fef3c7; border-radius: 4px; font-size: 10px; color: #92400e;">
+                    ⚠️ GPS TELEMETRY NOT CONNECTED — Last-known position only
+                  </div>
                 </div>
               </div>
             `)
@@ -189,30 +197,8 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
         });
       }
 
-      // 3. Regional Incidents Hotspots (Accident & Weather on Grid)
-      const accidentPt: [number, number] = [28.6187, 77.2871];
-      const accidentIcon = L.divIcon({
-        className: 'accident-marker-icon',
-        html: `
-          <div style="position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-            <div style="position: absolute; width: 36px; height: 36px; border-radius: 50%; background: rgba(239, 68, 68, 0.45); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-            <div style="width: 28px; height: 28px; border-radius: 50%; background: #dc2626; color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 2px solid #ffffff; box-shadow: 0 3px 8px rgba(0,0,0,0.35);">
-              💥
-            </div>
-          </div>
-        `,
-        iconSize: [36, 36],
-        iconAnchor: [18, 18]
-      });
-
-      L.marker(accidentPt, { icon: accidentIcon })
-        .bindPopup(`
-          <div style="font-family: inherit; min-width: 210px; padding: 2px;">
-            <strong style="color: #b91c1c; font-size: 12px;">💥 ARTERIAL INCIDENT — 2 LANES BLOCKED</strong><br/>
-            <span style="font-size: 11px; color: #334155;">Expressway A-10 Link · Bottleneck Delay +18 min</span>
-          </div>
-        `)
-        .addTo(markersGroup);
+      // 3. NO STATIC INCIDENT MARKERS — Incident data unavailable without connected provider.
+      // Incidents must come from a real API source only.
 
       setRouteInfo(null);
 

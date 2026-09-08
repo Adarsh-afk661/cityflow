@@ -11,7 +11,7 @@ export interface WeatherData {
   timestamp: string;
 }
 
-export async function fetchCorridorWeather(lat: number, lon: number): Promise<WeatherData> {
+export async function fetchCorridorWeather(lat: number, lon: number): Promise<WeatherData | null> {
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current=temperature_2m,relative_humidity_2m,precipitation,rain,weather_code,wind_speed_10m`;
     const response = await fetch(url, {
@@ -22,22 +22,28 @@ export async function fetchCorridorWeather(lat: number, lon: number): Promise<We
       const data = (await response.json()) as any;
       const current = data.current;
       if (current) {
-        const temp = current.temperature_2m ?? 26.5;
-        const precip = current.precipitation ?? 0;
-        const rain = current.rain ?? 0;
-        const wind = current.wind_speed_10m ?? 12;
-        const humidity = current.relative_humidity_2m ?? 55;
+        const temp = current.temperature_2m;
+        const precip = current.precipitation;
+        const rain = current.rain;
+        const wind = current.wind_speed_10m;
+        const humidity = current.relative_humidity_2m;
         const code = current.weather_code ?? 0;
 
+        // Only return data if we have actual values from API
+        if (temp === undefined || wind === undefined) {
+          console.warn('[WeatherService] Incomplete data from Open-Meteo response');
+          return null;
+        }
+
         const conditionText = decodeWmoWeatherCode(code);
-        const weatherRiskScore = calculateWeatherRisk(rain, wind, code);
+        const weatherRiskScore = calculateWeatherRisk(rain ?? 0, wind, code);
 
         return {
           temperatureC: temp,
-          precipitationMm: precip,
-          rainMm: rain,
+          precipitationMm: precip ?? 0,
+          rainMm: rain ?? 0,
           windSpeedKmh: wind,
-          humidityPercent: humidity,
+          humidityPercent: humidity ?? 0,
           weatherCode: code,
           conditionText,
           weatherRiskScore,
@@ -50,19 +56,8 @@ export async function fetchCorridorWeather(lat: number, lon: number): Promise<We
     console.warn('[WeatherService] Live Open-Meteo fetch failed:', (err as Error).message);
   }
 
-  // Graceful realistic baseline
-  return {
-    temperatureC: 28.0,
-    precipitationMm: 0,
-    rainMm: 0,
-    windSpeedKmh: 14.5,
-    humidityPercent: 52,
-    weatherCode: 1,
-    conditionText: 'Mainly Clear / High Visibility',
-    weatherRiskScore: 5,
-    source: 'CityFlow Regional Climatology Baseline',
-    timestamp: new Date().toISOString()
-  };
+  // Return null — caller must display WEATHER DATA UNAVAILABLE, not fake values
+  return null;
 }
 
 function decodeWmoWeatherCode(code: number): string {

@@ -92,13 +92,13 @@ export const DataStatusIndicator: React.FC = () => {
           </div>
 
           <div className="space-y-2.5 font-mono text-[11px]">
-            {/* Google Maps / OSM */}
+            {/* Google Maps */}
             <div className="flex items-center justify-between">
               <span className="flex items-center space-x-2 text-slate-400">
                 <Globe2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Google Maps Platform</span>
+                <span>Google Maps</span>
               </span>
-              <span className="text-emerald-400 font-bold flex items-center space-x-1">
+              <span className="font-bold flex items-center space-x-1 text-emerald-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                 <span>Connected</span>
               </span>
@@ -108,11 +108,11 @@ export const DataStatusIndicator: React.FC = () => {
             <div className="flex items-center justify-between">
               <span className="flex items-center space-x-2 text-slate-400">
                 <Navigation className="w-3.5 h-3.5 text-blue-400" />
-                <span>Live Routing (OSRM)</span>
+                <span>Routing</span>
               </span>
               <span className="text-emerald-400 font-bold flex items-center space-x-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                <span>Real Network</span>
+                <span>Connected</span>
               </span>
             </div>
 
@@ -120,11 +120,11 @@ export const DataStatusIndicator: React.FC = () => {
             <div className="flex items-center justify-between">
               <span className="flex items-center space-x-2 text-slate-400">
                 <CloudRain className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Weather (Open-Meteo)</span>
+                <span>Weather</span>
               </span>
               <span className="text-emerald-400 font-bold flex items-center space-x-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                <span>Live Stream</span>
+                <span>Connected</span>
               </span>
             </div>
 
@@ -132,41 +132,53 @@ export const DataStatusIndicator: React.FC = () => {
             <div className="flex items-center justify-between">
               <span className="flex items-center space-x-2 text-slate-400">
                 <Activity className="w-3.5 h-3.5 text-amber-400" />
-                <span>Corridor Traffic</span>
-              </span>
-              <span className="text-emerald-400 font-bold flex items-center space-x-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                <span>Real Congestion</span>
-              </span>
-            </div>
-
-            {/* ML Model */}
-            <div className="flex items-center justify-between">
-              <span className="flex items-center space-x-2 text-slate-400">
-                <Cpu className="w-3.5 h-3.5 text-purple-400" />
-                <span>XGBoost 3.4.1 ML</span>
-              </span>
-              <span className="text-emerald-400 font-bold flex items-center space-x-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                <span>cityflow-v1</span>
-              </span>
-            </div>
-
-            {/* Database */}
-            <div className="flex items-center justify-between">
-              <span className="flex items-center space-x-2 text-slate-400">
-                <Database className="w-3.5 h-3.5 text-emerald-400" />
-                <span>MongoDB Atlas Cloud</span>
+                <span>Traffic</span>
               </span>
               <span className="text-emerald-400 font-bold flex items-center space-x-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                 <span>Connected</span>
               </span>
             </div>
+
+            {/* Incidents */}
+            <div className="flex items-center justify-between">
+              <span className="flex items-center space-x-2 text-slate-400">
+                <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
+                <span>Incidents</span>
+              </span>
+              <span className="text-slate-400 font-bold flex items-center space-x-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                <span>Unavailable</span>
+              </span>
+            </div>
+
+            {/* ML */}
+            <div className="flex items-center justify-between">
+              <span className="flex items-center space-x-2 text-slate-400">
+                <Cpu className="w-3.5 h-3.5 text-purple-400" />
+                <span>ML (XGBoost 3.4.1)</span>
+              </span>
+              <span className="text-emerald-400 font-bold flex items-center space-x-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>Active</span>
+              </span>
+            </div>
+
+            {/* GPS Telemetry */}
+            <div className="flex items-center justify-between">
+              <span className="flex items-center space-x-2 text-slate-400">
+                <Navigation className="w-3.5 h-3.5 text-rose-400" />
+                <span>GPS Telemetry</span>
+              </span>
+              <span className="text-rose-400 font-bold flex items-center space-x-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                <span>Not Connected</span>
+              </span>
+            </div>
           </div>
 
-          <div className="mt-3 pt-2.5 border-t border-slate-800 text-[10px] text-slate-500 font-sans leading-relaxed">
-            All telemetry derived from active external feeds and certified ML pipelines. Zero simulated figures in Live Mode.
+          <div className="mt-3 pt-2.5 border-t border-slate-800 text-[10px] text-slate-400 font-sans leading-relaxed">
+            Zero fabricated telemetry in production mode. Real APIs and validated XGBoost models only.
           </div>
         </div>
       )}

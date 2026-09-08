@@ -84,19 +84,18 @@ export const FleetTable: React.FC = () => {
             <tr className="border-b border-slate-200 bg-slate-50 text-[10px] text-slate-500 uppercase tracking-wider font-bold">
               <th className="py-2.5 px-3">Vehicle ID</th>
               <th className="py-2.5 px-3">Type</th>
-              <th className="py-2.5 px-3">Driver</th>
-              <th className="py-2.5 px-3">Status</th>
-              <th className="py-2.5 px-3">Current Route</th>
-              <th className="py-2.5 px-3">ETA</th>
-              <th className="py-2.5 px-3">Reliability</th>
-              <th className="py-2.5 px-3">Risk Level</th>
+              <th className="py-2.5 px-3">Assigned Driver</th>
+              <th className="py-2.5 px-3">Dimensions (H × W × L)</th>
+              <th className="py-2.5 px-3">Max Weight</th>
+              <th className="py-2.5 px-3">Assigned Route</th>
+              <th className="py-2.5 px-3">Telematics Status</th>
               <th className="py-2.5 px-3 text-right">Inspect</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 font-mono">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-8 text-center text-slate-400 font-sans text-xs">
+                <td colSpan={8} className="py-8 text-center text-slate-400 font-sans text-xs">
                   No vehicles match the selected operational filters.
                 </td>
               </tr>
@@ -118,49 +117,19 @@ export const FleetTable: React.FC = () => {
                     <td className="py-3 px-3 font-sans text-slate-800 font-semibold">
                       {veh.driver}
                     </td>
-                    <td className="py-3 px-3">
-                      <span
-                        className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
-                          veh.status === 'active'
-                            ? 'bg-emerald-100 text-[#166534]'
-                            : veh.status === 'delayed'
-                            ? 'bg-rose-100 text-rose-700'
-                            : 'bg-slate-100 text-slate-700'
-                        }`}
-                      >
-                        {veh.status}
-                      </span>
+                    <td className="py-3 px-3 text-slate-700">
+                      {veh.vehicleSpecs?.height || 3.8}m × {veh.vehicleSpecs?.width || 2.4}m × {veh.vehicleSpecs?.length || 10.0}m
+                    </td>
+                    <td className="py-3 px-3 text-slate-700">
+                      {veh.vehicleSpecs?.weight || 14.0} T
                     </td>
                     <td className="py-3 px-3 font-sans text-slate-600">
-                      {veh.currentRouteName}
-                    </td>
-                    <td className="py-3 px-3 text-slate-900 font-bold">
-                      {veh.etaMin > 0 ? `${veh.etaMin}m` : '—'}
+                      {veh.currentRouteName || 'Depot Staging'}
                     </td>
                     <td className="py-3 px-3">
-                      <span
-                        className={`font-bold ${
-                          veh.reliabilityScore >= 90
-                            ? 'text-[#166534]'
-                            : veh.reliabilityScore >= 75
-                            ? 'text-blue-700'
-                            : 'text-rose-600'
-                        }`}
-                      >
-                        {veh.reliabilityScore} / 100
-                      </span>
-                    </td>
-                    <td className="py-3 px-3">
-                      <span
-                        className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${
-                          veh.riskLevel === 'low'
-                            ? 'text-[#166534] bg-emerald-50'
-                            : veh.riskLevel === 'medium'
-                            ? 'text-amber-800 bg-amber-50'
-                            : 'text-rose-700 bg-rose-50'
-                        }`}
-                      >
-                        {veh.riskLevel}
+                      <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 flex items-center space-x-1.5 w-fit">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                        <span>GPS NOT CONNECTED</span>
                       </span>
                     </td>
                     <td className="py-3 px-3 text-right">

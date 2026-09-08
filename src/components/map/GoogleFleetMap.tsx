@@ -111,7 +111,7 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
   const [mapError, setMapError] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const googleApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+  const googleApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || (typeof window !== 'undefined' ? localStorage.getItem('CITYFLOW_GOOGLE_MAPS_KEY') || '' : '');
 
   // Initialize Google Maps JavaScript API
   useEffect(() => {
@@ -278,118 +278,48 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
       });
       markersRef.current.push(destMarker);
 
-      // 3. Accident / Collision Hazard Marker (💥)
-      const routeA = candidateRoutes.find(r => r.id === 'route-a') || candidateRoutes[0];
-      const routeAWaypoints = (routeA as any).realCoordinates || [];
-      const incidentIdx = Math.floor(routeAWaypoints.length * 0.38);
-      const incidentPt = routeAWaypoints[incidentIdx]
-        ? { lat: routeAWaypoints[incidentIdx][1], lng: routeAWaypoints[incidentIdx][0] }
-        : { lat: 28.6187, lng: 77.2871 };
+      // 3. Render physical clearance checkpoint violation marker ONLY if vehicle physically breaches infrastructure
+      candidateRoutes.forEach(r => {
+        if (r.clearanceStatus === 'failed' && r.clearanceChecks) {
+          const failedCheck = r.clearanceChecks.find(c => !c.passed);
+          if (failedCheck && (r as any).realCoordinates && (r as any).realCoordinates.length > 2) {
+            const midIdx = Math.floor((r as any).realCoordinates.length / 2);
+            const breachPt = {
+              lat: (r as any).realCoordinates[midIdx][1],
+              lng: (r as any).realCoordinates[midIdx][0]
+            };
 
-      const accidentMarker = new google.maps.Marker({
-        position: incidentPt,
-        map,
-        title: 'Severe Incident: Multi-Vehicle Collision (+18 min delay)',
-        label: { text: '💥', fontSize: '18px' },
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 16,
-          fillColor: '#dc2626',
-          fillOpacity: 0.9,
-          strokeColor: '#ffffff',
-          strokeWeight: 2
+            const breachMarker = new google.maps.Marker({
+              position: breachPt,
+              map,
+              title: `Clearance Breach: ${failedCheck.infrastructureName}`,
+              label: { text: '⛔', fontSize: '14px' },
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 14,
+                fillColor: '#dc2626',
+                fillOpacity: 0.95,
+                strokeColor: '#ffffff',
+                strokeWeight: 2
+              }
+            });
+
+            const breachInfo = new google.maps.InfoWindow({
+              content: `
+                <div style="color: #0f172a; font-family: sans-serif; padding: 4px;">
+                  <strong style="color: #dc2626; font-size: 12px;">⛔ PHYSICAL CLEARANCE BREACH</strong><br/>
+                  <span style="font-size: 11px;">${failedCheck.infrastructureName} (${failedCheck.infrastructureType})</span><br/>
+                  <span style="font-size: 11px; color: #b91c1c; font-weight: bold;">${failedCheck.failureReason || 'Exceeds vehicle height limit'}</span>
+                </div>
+              `
+            });
+            breachMarker.addListener('click', () => {
+              breachInfo.open(map, breachMarker);
+            });
+            markersRef.current.push(breachMarker);
+          }
         }
       });
-
-      const accidentInfoWindow = new google.maps.InfoWindow({
-        content: `
-          <div style="color: #0f172a; font-family: sans-serif; padding: 4px;">
-            <strong style="color: #dc2626; font-size: 13px;">💥 LIVE ACCIDENT / COLLISION</strong><br/>
-            <span style="font-size: 11px;">Expressway A-10 (Km 14.8) · 2 Right Lanes Blocked</span><br/>
-            <span style="font-size: 11px; color: #dc2626; font-weight: bold;">+18 min bottleneck queue</span><br/>
-            <div style="margin-top: 4px; font-size: 10px; color: #047857; font-weight: bold;">
-              RouteShield: Outer Ring Beltway (Route B) bypasses this crash
-            </div>
-          </div>
-        `
-      });
-      accidentMarker.addListener('click', () => {
-        accidentInfoWindow.open(map, accidentMarker);
-      });
-      markersRef.current.push(accidentMarker);
-
-      // 4. Weather Advisory Hazard Marker (🌧️)
-      const weatherIdx = Math.floor(waypoints.length * 0.68);
-      const weatherPt = waypoints[weatherIdx]
-        ? { lat: waypoints[weatherIdx][1], lng: waypoints[weatherIdx][0] }
-        : { lat: 28.6255, lng: 77.3125 };
-
-      const weatherMarker = new google.maps.Marker({
-        position: weatherPt,
-        map,
-        title: 'Weather Alert: Heavy Downpour 14.5 mm/h',
-        label: { text: '🌧️', fontSize: '18px' },
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 16,
-          fillColor: '#0284c7',
-          fillOpacity: 0.9,
-          strokeColor: '#ffffff',
-          strokeWeight: 2
-        }
-      });
-
-      const weatherInfoWindow = new google.maps.InfoWindow({
-        content: `
-          <div style="color: #0f172a; font-family: sans-serif; padding: 4px;">
-            <strong style="color: #0284c7; font-size: 13px;">🌧️ LIVE WEATHER ADVISORY</strong><br/>
-            <span style="font-size: 11px;">Heavy Rain (14.5 mm/h) · Wet Road Surface</span><br/>
-            <span style="font-size: 11px; color: #b45309; font-weight: bold;">Braking Distance +35% · Max Speed 45 km/h</span>
-          </div>
-        `
-      });
-      weatherMarker.addListener('click', () => {
-        weatherInfoWindow.open(map, weatherMarker);
-      });
-      markersRef.current.push(weatherMarker);
-
-      // 5. Overhead Clearance Underpass Marker (🚧)
-      const underpassIdx = Math.floor(routeAWaypoints.length * 0.48);
-      const underpassPt = routeAWaypoints[underpassIdx]
-        ? { lat: routeAWaypoints[underpassIdx][1], lng: routeAWaypoints[underpassIdx][0] }
-        : { lat: 28.6211, lng: 77.2850 };
-      const isHeightViolated = selectedVehicle ? selectedVehicle.height > 3.8 : true;
-
-      const underpassMarker = new google.maps.Marker({
-        position: underpassPt,
-        map,
-        title: `Underpass Checkpoint: 3.8m Limit (${isHeightViolated ? 'BARRED' : 'PASSED'})`,
-        label: { text: '🚧', fontSize: '16px' },
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 15,
-          fillColor: isHeightViolated ? '#dc2626' : '#d97706',
-          fillOpacity: 0.9,
-          strokeColor: '#ffffff',
-          strokeWeight: 2
-        }
-      });
-
-      const underpassInfoWindow = new google.maps.InfoWindow({
-        content: `
-          <div style="color: #0f172a; font-family: sans-serif; padding: 4px;">
-            <strong style="color: ${isHeightViolated ? '#dc2626' : '#d97706'}; font-size: 13px;">🚧 METRO UNDERPASS (3.8m LIMIT)</strong><br/>
-            <span style="font-size: 11px;">Vehicle Height: ${selectedVehicle ? selectedVehicle.height : 4.0}m</span><br/>
-            <span style="font-size: 11px; font-weight: bold; color: ${isHeightViolated ? '#dc2626' : '#166534'};">
-              ${isHeightViolated ? '⛔ Physical Clearance Breach — Route Barred' : '✅ Clearance Approved'}
-            </span>
-          </div>
-        `
-      });
-      underpassMarker.addListener('click', () => {
-        underpassInfoWindow.open(map, underpassMarker);
-      });
-      markersRef.current.push(underpassMarker);
     }
 
     // Smoothly fit map to entire route bounds
@@ -438,16 +368,16 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
           <span>Alt Corridor (Clickable)</span>
         </div>
         <div className="flex items-center space-x-1.5">
-          <span>💥</span>
-          <span>Accident</span>
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block text-white text-[9px] flex items-center justify-center font-bold">A</span>
+          <span>Origin</span>
         </div>
         <div className="flex items-center space-x-1.5">
-          <span>🌧️</span>
-          <span>Weather</span>
+          <span className="w-2.5 h-2.5 rounded-full bg-red-600 inline-block text-white text-[9px] flex items-center justify-center font-bold">B</span>
+          <span>Destination</span>
         </div>
         <div className="flex items-center space-x-1.5">
-          <span>🚧</span>
-          <span>Underpass</span>
+          <span>⛔</span>
+          <span>Clearance Breach</span>
         </div>
       </div>
     </div>

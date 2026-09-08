@@ -52,49 +52,37 @@ export const DashboardPage: React.FC = () => {
         </button>
       </div>
 
-      {/* KPI Cards Row */}
+      {/* Real Data KPI Cards Row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <MetricCard
-          title="ACTIVE VEHICLES"
-          value="24"
-          trend="+12.4%"
-          isPositive={true}
+          title="REGISTERED VEHICLES"
+          value={fleet.length}
           icon={<Truck className="w-4 h-4 text-[#166534]" />}
-          subtitle="Commercial units"
+          subtitle="Database fleet profiles"
         />
         <MetricCard
-          title="ROUTES OPTIMIZED"
-          value="187"
-          trend="+8.7%"
-          isPositive={true}
+          title="CORRIDORS ANALYZED"
+          value="Awaiting data"
           icon={<Zap className="w-4 h-4 text-blue-700" />}
-          subtitle="Clearance certified"
+          subtitle="Query RouteShield"
         />
         <MetricCard
           title="AVG RELIABILITY"
-          value="91"
-          unit="/100"
-          trend="+3.2%"
-          isPositive={true}
+          value="Awaiting data"
           icon={<ShieldCheck className="w-4 h-4 text-[#166534]" />}
-          subtitle="On-time probability"
+          subtitle="Requires logged trips"
         />
         <MetricCard
-          title="CO₂ SAVED"
-          value="342"
-          unit="kg"
-          trend="+14.5%"
-          isPositive={true}
+          title="ESTIMATED CO₂ SAVED"
+          value="Awaiting data"
           icon={<Leaf className="w-4 h-4 text-[#166534]" />}
-          subtitle="Eco-Flow savings"
+          subtitle="Direct vehicle calculation"
         />
         <MetricCard
-          title="DELAYS PREVENTED"
-          value="28"
-          trend="-4.2%"
-          isPositive={true}
+          title="ACTIVE ALERTS"
+          value={activeAlerts.length}
           icon={<AlertTriangle className="w-4 h-4 text-amber-700" />}
-          subtitle="Clearance bypasses"
+          subtitle="Live incident telemetry"
         />
       </div>
 

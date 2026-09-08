@@ -7,7 +7,11 @@ import {
   Pause,
   Sparkles,
   ChevronDown,
-  Globe
+  Globe,
+  Database,
+  LogIn,
+  LogOut,
+  UserCheck
 } from 'lucide-react';
 import { useCityFlow } from '../../context/CityFlowContext';
 
@@ -20,7 +24,11 @@ export const TopNav: React.FC = () => {
     alerts,
     setActivePage,
     startGuidedDemo,
-    fleet
+    fleet,
+    user,
+    setLoginModalOpen,
+    setDataFeedModalOpen,
+    logout
   } = useCityFlow();
 
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
@@ -135,6 +143,17 @@ export const TopNav: React.FC = () => {
           )}
         </button>
 
+        {/* Feed Data Studio CTA */}
+        <button
+          id="top-feed-data-btn"
+          onClick={() => setDataFeedModalOpen(true)}
+          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-xs font-semibold text-emerald-800 transition shadow-sm"
+          title="Manually feed commercial vehicles, freight corridors & hazard alerts to MongoDB Atlas"
+        >
+          <Database className="w-3.5 h-3.5 text-[#166534]" />
+          <span>Feed Data</span>
+        </button>
+
         {/* Primary LAUNCH DEMO CTA */}
         <button
           id="top-launch-demo-btn"
@@ -144,6 +163,34 @@ export const TopNav: React.FC = () => {
           <Sparkles className="w-3.5 h-3.5" />
           <span>LAUNCH DEMO</span>
         </button>
+
+        {/* User Session / Sign In */}
+        {user ? (
+          <div className="flex items-center space-x-1.5 pl-2 border-l border-slate-200">
+            <div
+              className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 font-medium"
+              title={`Logged in as ${user.email}`}
+            >
+              <UserCheck className="w-3.5 h-3.5 text-emerald-700" />
+              <span className="font-semibold max-w-[100px] truncate">{user.name || user.email.split('@')[0]}</span>
+            </div>
+            <button
+              onClick={logout}
+              title="Log out operator"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setLoginModalOpen(true)}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 hover:text-slate-900 transition shadow-xs"
+          >
+            <LogIn className="w-3.5 h-3.5 text-slate-500" />
+            <span>Sign In</span>
+          </button>
+        )}
       </div>
     </header>
   );

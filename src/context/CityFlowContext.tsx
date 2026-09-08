@@ -6,7 +6,9 @@ import {
   CityZone,
   FleetVehicle,
   Alert,
-  SystemStatusState
+  SystemStatusState,
+  User,
+  Corridor
 } from '../types';
 import { DEFAULT_VEHICLES } from '../data/defaultVehicles';
 import { INITIAL_BASE_ROUTES, CITY_ZONES } from '../data/cityNetwork';
@@ -25,6 +27,21 @@ interface CityFlowContextType {
   setActivePage: (page: PageName) => void;
   selectedCity: string;
   setSelectedCity: (city: string) => void;
+
+  // Authentication
+  user: User | null;
+  setUser: (user: User | null) => void;
+  loginModalOpen: boolean;
+  setLoginModalOpen: (open: boolean) => void;
+  logout: () => void;
+
+  // Manual Data Feeding
+  dataFeedModalOpen: boolean;
+  setDataFeedModalOpen: (open: boolean) => void;
+  addCustomRoute: (routeData: any) => Promise<void>;
+  deleteCustomRoute: (id: string) => Promise<void>;
+  addCustomAlert: (alertData: any) => Promise<void>;
+  deleteCustomAlert: (id: string) => Promise<void>;
 
   // Vehicles
   vehicles: Vehicle[];
@@ -86,6 +103,18 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [activePage, setActivePage] = useState<PageName>('landing');
   const [selectedCity, setSelectedCity] = useState<string>('Metroflow Metropolitan');
 
+  // Authentication State
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem('cityflow_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+  const [loginModalOpen, setLoginModalOpen] = useState<boolean>(false);
+  const [dataFeedModalOpen, setDataFeedModalOpen] = useState<boolean>(false);
+
   // Vehicles
   const [vehicles, setVehicles] = useState<Vehicle[]>(DEFAULT_VEHICLES);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle>(DEFAULT_VEHICLES[0]); // Heavy Delivery Truck
@@ -114,6 +143,38 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
   // City Zones
   const [cityZones, setCityZones] = useState<CityZone[]>(CITY_ZONES);
   const [selectedZone, setSelectedZone] = useState<CityZone | null>(null);
+
+  // Initial Data Fetching from MongoDB Backend
+  useEffect(() => {
+    const fetchRemoteData = async () => {
+      try {
+        const [vehRes, alertRes, routeRes] = await Promise.all([
+          fetch('/api/vehicles').catch(() => null),
+          fetch('/api/alerts').catch(() => null),
+          fetch('/api/routes').catch(() => null)
+        ]);
+
+        if (vehRes && vehRes.ok) {
+          const vehData = await vehRes.json();
+          if (Array.isArray(vehData) && vehData.length > 0) {
+            setVehicles(vehData);
+            setSelectedVehicle(vehData[0]);
+          }
+        }
+
+        if (alertRes && alertRes.ok) {
+          const alertData = await alertRes.json();
+          if (Array.isArray(alertData) && alertData.length > 0) {
+            setAlerts(alertData);
+          }
+        }
+      } catch (e) {
+        console.warn('Backend sync fallback to local store');
+      }
+    };
+
+    fetchRemoteData();
+  }, []);
 
   // System Status
   const [systemStatus] = useState<SystemStatusState>({
@@ -253,16 +314,117 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
     );
   };
 
-  const addCustomVehicle = (newVeh: Vehicle) => {
+  const addCustomVehicle = async (newVeh: Vehicle) => {
     setVehicles(prev => [...prev, newVeh]);
     setSelectedVehicle(newVeh);
+    try {
+      await fetch('/api/vehicles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newVeh)
+      });
+    } catch (e) {
+      console.warn('Vehicle sync fallback');
+    }
   };
 
-  const deleteVehicle = (id: string) => {
+  const deleteVehicle = async (id: string) => {
     setVehicles(prev => prev.filter(v => v.id !== id));
     if (selectedVehicle.id === id) {
       setSelectedVehicle(DEFAULT_VEHICLES[0]);
     }
+    try {
+      await fetch(`/api/vehicles/${id}`, { method: 'DELETE' });
+    } catch (e) {}
+  };
+
+  const addCustomRoute = async (routeData: any) => {
+    try {
+      await fetch('/api/routes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(routeData)
+      });
+    } catch (e) {}
+
+    const isExceeded = selectedVehicle.height > (routeData.minClearanceHeightM || 4.2);
+    const newCandidateRoute: CandidateRoute = {
+      id: routeData.id || `custom-route-${Date.now()}`,
+      name: routeData.name,
+      corridorName: routeData.corridorCode || routeData.name,
+      distanceKm: routeData.distanceKm,
+      baseDurationMin: routeData.baseEtaMin,
+      currentEtaMin: routeData.baseEtaMin,
+      predictedTimeRange: { min: routeData.baseEtaMin - 3, max: routeData.baseEtaMin + 8 },
+      reliabilityScore: 94,
+      delayRiskPercent: 8,
+      safetyScore: 92,
+      safetyBreakdown: {
+        trafficRisk: 8,
+        roadComplexity: 6,
+        incidentRisk: 5,
+        weatherRisk: 4,
+        infrastructureRisk: isExceeded ? 95 : 5
+      },
+      estimatedCo2Kg: 13.8,
+      co2SavingsKg: 2.4,
+      fuelImpactLiters: 11.2,
+      trafficLevel: 'smooth',
+      clearanceStatus: isExceeded ? 'failed' : 'approved',
+      clearanceChecks: [
+        {
+          passed: !isExceeded,
+          infrastructureId: 'custom-underpass',
+          infrastructureName: routeData.criticalChokepoint || 'Highway Underpass Arch',
+          infrastructureType: 'underpass',
+          failureReason: isExceeded
+            ? `Vehicle height (${selectedVehicle.height}m) exceeds corridor clearance limit (${routeData.minClearanceHeightM}m)`
+            : undefined
+        }
+      ],
+      overallScore: isExceeded ? 35 : 94,
+      pathWaypoints: [
+        { x: 140, y: 190, name: 'Custom Origin' },
+        { x: 250, y: 250, name: 'Midway Viaduct' },
+        { x: 370, y: 320, name: 'Destination Hub' }
+      ],
+      description: `Custom Corridor (${routeData.distanceKm} km, underpass clearance: ${routeData.minClearanceHeightM}m)`,
+      infrastructureEncountered: [routeData.criticalChokepoint || 'Custom Underpass'],
+      tags: ['Custom Corridor', 'MongoDB Atlas']
+    };
+
+    setCandidateRoutes(prev => [newCandidateRoute, ...prev]);
+    setSelectedRoute(newCandidateRoute);
+  };
+
+  const deleteCustomRoute = async (id: string) => {
+    setCandidateRoutes(prev => prev.filter(r => r.id !== id));
+    try {
+      await fetch(`/api/routes/${id}`, { method: 'DELETE' });
+    } catch (e) {}
+  };
+
+  const addCustomAlert = async (alertData: any) => {
+    try {
+      await fetch('/api/alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(alertData)
+      });
+    } catch (e) {}
+    setAlerts(prev => [alertData, ...prev]);
+  };
+
+  const deleteCustomAlert = async (id: string) => {
+    setAlerts(prev => prev.filter(a => a.id !== id));
+    try {
+      await fetch(`/api/alerts/${id}`, { method: 'DELETE' });
+    } catch (e) {}
+  };
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem('cityflow_user');
   };
 
   // Re-evaluate routes when routing mode or vehicle changes
@@ -339,6 +501,17 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
         setActivePage,
         selectedCity,
         setSelectedCity,
+        user,
+        setUser,
+        loginModalOpen,
+        setLoginModalOpen,
+        logout,
+        dataFeedModalOpen,
+        setDataFeedModalOpen,
+        addCustomRoute,
+        deleteCustomRoute,
+        addCustomAlert,
+        deleteCustomAlert,
         vehicles,
         selectedVehicle,
         setSelectedVehicle,

@@ -13,12 +13,20 @@ import { AlertsPage } from './pages/AlertsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { DemoGuideBanner } from './components/demo/DemoGuideBanner';
 import { DemoFinalModal } from './components/demo/DemoFinalModal';
+import { LoginModal } from './components/auth/LoginModal';
+import { DataFeedModal } from './components/feed/DataFeedModal';
 
 const AppContent: React.FC = () => {
   const { activePage, setActivePage } = useCityFlow();
 
   if (activePage === 'landing') {
-    return <LandingPage onNavigatePlatform={setActivePage} />;
+    return (
+      <>
+        <LandingPage onNavigatePlatform={setActivePage} />
+        <LoginModal />
+        <DataFeedModal />
+      </>
+    );
   }
 
   const renderActivePage = () => {
@@ -58,6 +66,8 @@ const AppContent: React.FC = () => {
       {/* Demo Tour Guidance and Final Recommendation Modal */}
       <DemoGuideBanner />
       <DemoFinalModal />
+      <LoginModal />
+      <DataFeedModal />
     </div>
   );
 };

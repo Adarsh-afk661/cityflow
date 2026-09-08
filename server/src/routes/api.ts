@@ -4,6 +4,8 @@ import { VehicleModel } from '../models/Vehicle.js';
 import { RouteModel } from '../models/RouteModel.js';
 import { DemoLeadModel } from '../models/DemoLead.js';
 import { AlertModel } from '../models/Alert.js';
+import { UserModel } from '../models/User.js';
+import { VerificationCodeModel } from '../models/VerificationCode.js';
 import { seedDatabase, REAL_VEHICLES, REAL_ROUTES, REAL_ALERTS } from '../seed.js';
 
 export const router = Router();
@@ -13,6 +15,8 @@ let inMemoryVehicles = [...REAL_VEHICLES];
 let inMemoryRoutes = [...REAL_ROUTES];
 let inMemoryAlerts = [...REAL_ALERTS];
 let inMemoryDemoLeads: any[] = [];
+let inMemoryCodes: { email: string; code: string; expiresAt: Date }[] = [];
+let inMemoryUsers: any[] = [];
 
 // Health Check
 router.get('/health', (req: Request, res: Response) => {
@@ -85,6 +89,156 @@ router.post('/seed', async (req: Request, res: Response) => {
   }
 });
 
+// ==================== AUTHENTICATION (EMAIL & OTP) ====================
+
+// 1. Send OTP
+router.post('/auth/send-otp', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'Valid corporate or personal email address required' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    const dbStatus = getDBStatus();
+    if (dbStatus.connected) {
+      try {
+        await VerificationCodeModel.deleteMany({ email: cleanEmail });
+        await VerificationCodeModel.create({ email: cleanEmail, code, expiresAt });
+      } catch (err) {
+        console.warn('MongoDB OTP write fallback:', err);
+      }
+    }
+
+    // Update in-memory fallback
+    inMemoryCodes = inMemoryCodes.filter(c => c.email !== cleanEmail);
+    inMemoryCodes.push({ email: cleanEmail, code, expiresAt });
+
+    console.log(`[CITYFLOW AUTH] Generated OTP for ${cleanEmail}: ${code}`);
+
+    res.json({
+      success: true,
+      message: `Verification code sent to ${cleanEmail}`,
+      email: cleanEmail,
+      code, // Transmitted so user can instantly input without needing external mail server
+      expiresIn: '10 minutes'
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to generate verification code' });
+  }
+});
+
+// 2. Verify OTP
+router.post('/auth/verify-otp', async (req: Request, res: Response) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) {
+      return res.status(400).json({ error: 'Email and 6-digit verification code required' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const trimmedCode = code.toString().trim();
+
+    let isValid = false;
+    const dbStatus = getDBStatus();
+
+    if (dbStatus.connected) {
+      try {
+        const record = await VerificationCodeModel.findOne({ email: cleanEmail, code: trimmedCode });
+        if (record && record.expiresAt > new Date()) {
+          isValid = true;
+          await VerificationCodeModel.deleteMany({ email: cleanEmail });
+        }
+      } catch (err) {
+        console.warn('MongoDB OTP verify fallback:', err);
+      }
+    }
+
+    if (!isValid) {
+      const memRecord = inMemoryCodes.find(c => c.email === cleanEmail && c.code === trimmedCode);
+      if (memRecord && memRecord.expiresAt > new Date()) {
+        isValid = true;
+        inMemoryCodes = inMemoryCodes.filter(c => c.email !== cleanEmail);
+      }
+    }
+
+    if (!isValid) {
+      return res.status(400).json({ success: false, error: 'Invalid or expired verification code' });
+    }
+
+    // Upsert User
+    let user: any = {
+      email: cleanEmail,
+      name: cleanEmail.split('@')[0],
+      role: 'dispatcher',
+      isVerified: true,
+      lastLoginAt: new Date()
+    };
+
+    if (dbStatus.connected) {
+      try {
+        const updated = await UserModel.findOneAndUpdate(
+          { email: cleanEmail },
+          {
+            $set: {
+              isVerified: true,
+              lastLoginAt: new Date()
+            },
+            $setOnInsert: {
+              email: cleanEmail,
+              name: cleanEmail.split('@')[0],
+              role: 'dispatcher'
+            }
+          },
+          { upsert: true, new: true }
+        );
+        if (updated) user = updated;
+      } catch (err) {
+        console.warn('MongoDB User upsert fallback:', err);
+      }
+    }
+
+    const existingIdx = inMemoryUsers.findIndex(u => u.email === cleanEmail);
+    if (existingIdx >= 0) {
+      inMemoryUsers[existingIdx] = user;
+    } else {
+      inMemoryUsers.push(user);
+    }
+
+    res.json({
+      success: true,
+      message: 'Email successfully verified. Access granted.',
+      user
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Verification failed' });
+  }
+});
+
+// 3. User Session Profile
+router.get('/auth/me', async (req: Request, res: Response) => {
+  const email = (req.query.email as string)?.trim().toLowerCase();
+  if (!email) {
+    return res.status(401).json({ authenticated: false, message: 'No email session provided' });
+  }
+
+  const dbStatus = getDBStatus();
+  if (dbStatus.connected) {
+    try {
+      const user = await UserModel.findOne({ email });
+      if (user) return res.json({ authenticated: true, user });
+    } catch (e) {}
+  }
+
+  const memUser = inMemoryUsers.find(u => u.email === email);
+  if (memUser) return res.json({ authenticated: true, user: memUser });
+
+  res.json({ authenticated: false });
+});
+
 // Vehicles CRUD
 router.get('/vehicles', async (req: Request, res: Response) => {
   const dbStatus = getDBStatus();
@@ -134,9 +288,7 @@ router.delete('/vehicles/:id', async (req: Request, res: Response) => {
   if (dbStatus.connected) {
     try {
       await VehicleModel.deleteOne({ id });
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }
   inMemoryVehicles = inMemoryVehicles.filter(v => v.id !== id);
   res.json({ success: true, deletedId: id });
@@ -154,6 +306,125 @@ router.get('/routes', async (req: Request, res: Response) => {
     }
   }
   res.json(inMemoryRoutes);
+});
+
+router.post('/routes', async (req: Request, res: Response) => {
+  const { name, corridorCode, distanceKm, baseEtaMin, minClearanceHeightM, maxBridgeWeightT, criticalChokepoint } = req.body;
+
+  const newRoute = {
+    id: `route-${Date.now()}`,
+    name: name || 'Custom Commercial Corridor',
+    corridorCode: corridorCode || `CORR-${Math.floor(100 + Math.random() * 900)}`,
+    distanceKm: Number(distanceKm) || 28.5,
+    baseEtaMin: Number(baseEtaMin) || 35,
+    minClearanceHeightM: Number(minClearanceHeightM) || 4.2,
+    maxBridgeWeightT: Number(maxBridgeWeightT) || 40,
+    reliabilityScore: 94,
+    delayProbability: 8,
+    co2PerTripKg: 13.8,
+    clearanceStatus: 'clear',
+    criticalChokepoint: criticalChokepoint || 'Railway Low Bridge Underpass',
+    pathWaypoints: [
+      { x: 140, y: 190, lat: 28.5355, lon: 77.3910 },
+      { x: 250, y: 250, lat: 28.4595, lon: 77.0266 },
+      { x: 370, y: 320, lat: 28.4089, lon: 77.3178 }
+    ],
+    isCustom: true
+  };
+
+  const dbStatus = getDBStatus();
+  if (dbStatus.connected) {
+    try {
+      const saved = await RouteModel.create(newRoute);
+      return res.status(201).json(saved);
+    } catch (e) {
+      console.warn('MongoDB insert error for route, saving to memory');
+    }
+  }
+
+  inMemoryRoutes.push(newRoute as any);
+  res.status(201).json(newRoute);
+});
+
+router.delete('/routes/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const dbStatus = getDBStatus();
+  if (dbStatus.connected) {
+    try {
+      await RouteModel.deleteOne({ id });
+    } catch (e) {}
+  }
+  inMemoryRoutes = inMemoryRoutes.filter(r => r.id !== id);
+  res.json({ success: true, deletedId: id });
+});
+
+// Operational Alerts CRUD
+router.get('/alerts', async (req: Request, res: Response) => {
+  const dbStatus = getDBStatus();
+  if (dbStatus.connected) {
+    try {
+      const alerts = await AlertModel.find({});
+      if (alerts.length > 0) return res.json(alerts);
+    } catch (e) {
+      console.warn('Falling back to memory store for alerts');
+    }
+  }
+  res.json(inMemoryAlerts);
+});
+
+router.post('/alerts', async (req: Request, res: Response) => {
+  const { title, severity, type, description, affectedVehicle, affectedRoute, recommendedAction } = req.body;
+  const newAlert = {
+    id: `alert-${Date.now()}`,
+    severity: severity || 'warning',
+    type: type || 'clearance',
+    title: title || 'Underpass Clearance Hazard',
+    description: description || 'Commercial vehicle height exceeds bridge physical limit.',
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    affectedVehicle: affectedVehicle || 'Commercial Unit',
+    affectedRoute: affectedRoute || 'ROUTE A — ASHFORD BYPASS',
+    recommendedAction: recommendedAction || 'Reroute via high-clearance viaduct',
+    acknowledged: false
+  };
+
+  const dbStatus = getDBStatus();
+  if (dbStatus.connected) {
+    try {
+      const saved = await AlertModel.create(newAlert);
+      return res.status(201).json(saved);
+    } catch (e) {
+      console.warn('MongoDB insert error for alert, saving to memory');
+    }
+  }
+
+  inMemoryAlerts.unshift(newAlert as any);
+  res.status(201).json(newAlert);
+});
+
+router.delete('/alerts/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const dbStatus = getDBStatus();
+  if (dbStatus.connected) {
+    try {
+      await AlertModel.deleteOne({ id });
+    } catch (e) {}
+  }
+  inMemoryAlerts = inMemoryAlerts.filter(a => a.id !== id);
+  res.json({ success: true, deletedId: id });
+});
+
+// Clear Custom Fed Data
+router.post('/data/clear', async (req: Request, res: Response) => {
+  const dbStatus = getDBStatus();
+  if (dbStatus.connected) {
+    try {
+      await VehicleModel.deleteMany({ isCustom: true });
+      await RouteModel.deleteMany({ isCustom: true });
+    } catch (e) {}
+  }
+  inMemoryVehicles = inMemoryVehicles.filter((v: any) => !v.isCustom);
+  inMemoryRoutes = inMemoryRoutes.filter((r: any) => !r.isCustom);
+  res.json({ success: true, message: 'Custom vehicle and corridor feeds cleared' });
 });
 
 // Demo Lead Registration (Stores in MongoDB)

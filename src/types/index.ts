@@ -147,3 +147,28 @@ export interface SystemStatusState {
   simulationEngine: boolean;
   liveFeedActive: boolean;
 }
+
+export interface User {
+  email: string;
+  name: string;
+  role: 'admin' | 'dispatcher' | 'fleet_manager';
+  isVerified: boolean;
+  lastLoginAt?: string;
+}
+
+export interface Corridor {
+  id: string;
+  name: string;
+  corridorCode: string;
+  distanceKm: number;
+  baseEtaMin: number;
+  minClearanceHeightM: number;
+  maxBridgeWeightT: number;
+  reliabilityScore: number;
+  delayProbability: number;
+  co2PerTripKg: number;
+  clearanceStatus: 'clear' | 'barred' | 'selected';
+  criticalChokepoint: string;
+  isCustom?: boolean;
+}
+

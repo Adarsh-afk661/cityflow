@@ -4,17 +4,16 @@ import { HeroSection } from './HeroSection';
 import { SocialProof } from './SocialProof';
 import { FeatureGrid } from './FeatureGrid';
 import { DemoModal } from './DemoModal';
-import { SignInModal } from './SignInModal';
 import { ArrowRight, ShieldCheck, Truck, Sparkles } from 'lucide-react';
-import { PageName } from '../../context/CityFlowContext';
+import { PageName, useCityFlow } from '../../context/CityFlowContext';
 
 interface LandingPageProps {
   onNavigatePlatform: (page: PageName) => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) => {
+  const { setLoginModalOpen } = useCityFlow();
   const [demoOpen, setDemoOpen] = useState(false);
-  const [signInOpen, setSignInOpen] = useState(false);
 
   const handleLaunchPlatform = (targetPage: PageName = 'dashboard') => {
     onNavigatePlatform(targetPage);
@@ -25,7 +24,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) 
       {/* Navigation Header */}
       <LandingNav
         onOpenDemo={() => setDemoOpen(true)}
-        onOpenSignIn={() => setSignInOpen(true)}
+        onOpenSignIn={() => setLoginModalOpen(true)}
         onLaunchPlatform={() => handleLaunchPlatform('dashboard')}
       />
 
@@ -97,11 +96,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) 
       <DemoModal
         isOpen={demoOpen}
         onClose={() => setDemoOpen(false)}
-      />
-      <SignInModal
-        isOpen={signInOpen}
-        onClose={() => setSignInOpen(false)}
-        onSuccess={() => handleLaunchPlatform('dashboard')}
       />
     </div>
   );

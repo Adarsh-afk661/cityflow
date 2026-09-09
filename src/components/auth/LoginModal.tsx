@@ -152,6 +152,36 @@ export const LoginModal: React.FC = () => {
                 </div>
               )}
 
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const op = {
+                      id: 'op-chief-dispatcher',
+                      name: 'Chief Dispatcher',
+                      email: 'adarsh@cityflow.dev',
+                      role: 'dispatcher' as const,
+                      isVerified: true
+                    };
+                    setUser(op);
+                    try {
+                      localStorage.setItem('cityflow_user', JSON.stringify(op));
+                    } catch (e) {}
+                    setLoginModalOpen(false);
+                    setActivePage('dashboard');
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-[#166534] font-bold text-xs flex items-center justify-center space-x-2 transition shadow-xs cursor-pointer"
+                >
+                  <ShieldCheck className="w-4 h-4 text-[#166534]" />
+                  <span>⚡ Instant Access as Chief Dispatcher</span>
+                </button>
+                <div className="flex items-center my-3 text-[10px] text-slate-400 uppercase font-mono">
+                  <span className="flex-1 border-b border-slate-200" />
+                  <span className="px-2">or sign in with email</span>
+                  <span className="flex-1 border-b border-slate-200" />
+                </div>
+              </div>
+
               <form onSubmit={handleSendOtp} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">

@@ -31,8 +31,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) 
             <button onClick={() => handleLaunchPlatform('fleet')}>Fleet Ops</button>
           </div>
           <div className="nav-cta">
-            <button className="btn ghost" onClick={() => setLoginModalOpen(true)}>Log in</button>
-            <button className="btn primary" onClick={() => setDemoOpen(true)}>Get a demo</button>
+            <button className="btn ghost" onClick={() => handleLaunchPlatform('dashboard')}>Console (Live)</button>
+            <button className="btn primary" onClick={() => handleLaunchPlatform('routeshield')}>Open RouteShield</button>
           </div>
         </div>
       </nav>
@@ -281,7 +281,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) 
             <div className="footer-col">
               <h4>Company</h4>
               <button onClick={() => setDemoOpen(true)}>About</button>
-              <button onClick={() => setLoginModalOpen(true)}>Careers</button>
+              <button onClick={() => handleLaunchPlatform('settings')}>Careers</button>
               <button onClick={() => setDemoOpen(true)}>Contact</button>
             </div>
             <div className="footer-col">

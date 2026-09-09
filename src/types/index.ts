@@ -153,6 +153,7 @@ export interface SystemStatusState {
 }
 
 export interface User {
+  id?: string;
   email: string;
   name: string;
   role: 'admin' | 'dispatcher' | 'fleet_manager';

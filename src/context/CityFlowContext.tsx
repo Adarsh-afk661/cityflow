@@ -103,14 +103,24 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [activePage, setActivePage] = useState<PageName>('landing');
   const [selectedCity, setSelectedCity] = useState<string>('Delhi — Greater Noida Corridor');
 
-  // Authentication State
+  // Permanent Authentication State — Never logs out
+  const DEFAULT_OPERATOR: User = {
+    id: 'op-chief-dispatcher',
+    name: 'Chief Dispatcher',
+    email: 'adarsh@cityflow.dev',
+    role: 'dispatcher',
+    isVerified: true
+  };
+
   const [user, setUser] = useState<User | null>(() => {
     try {
       const saved = localStorage.getItem('cityflow_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch (e) {
-      return null;
-    }
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    try {
+      localStorage.setItem('cityflow_user', JSON.stringify(DEFAULT_OPERATOR));
+    } catch (e) {}
+    return DEFAULT_OPERATOR;
   });
   const [loginModalOpen, setLoginModalOpen] = useState<boolean>(false);
   const [dataFeedModalOpen, setDataFeedModalOpen] = useState<boolean>(false);
@@ -512,8 +522,10 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const logout = () => {
-    setUser(null);
-    localStorage.removeItem('cityflow_user');
+    setUser(DEFAULT_OPERATOR);
+    try {
+      localStorage.setItem('cityflow_user', JSON.stringify(DEFAULT_OPERATOR));
+    } catch (e) {}
   };
 
   // Re-evaluate routes when routing mode or vehicle changes

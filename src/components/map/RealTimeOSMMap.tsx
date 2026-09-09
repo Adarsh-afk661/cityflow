@@ -423,7 +423,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
               <span style="display:inline-block; width: 10px; height: 10px; border-radius: 50%; background: #166534;"></span>
               <strong style="color: #166534; font-size: 13px;">ORIGIN (START)</strong>
             </div>
-            <div style="font-size: 11.5px; color: #1e293b; font-weight: 700;">${startLocation || 'Noida Sector 62'}</div>
+            <div style="font-size: 11.5px; color: #1e293b; font-weight: 700;">${startLocation || 'Delhi'}</div>
             <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Fleet Logistics Hub · Staging Bay #4</div>
           </div>
         `)
@@ -451,7 +451,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
               <span style="display:inline-block; width: 10px; height: 10px; border-radius: 50%; background: #b91c1c;"></span>
               <strong style="color: #b91c1c; font-size: 13px;">DESTINATION (TARGET)</strong>
             </div>
-            <div style="font-size: 11.5px; color: #1e293b; font-weight: 700;">${destinationLocation || 'Connaught Place, New Delhi'}</div>
+            <div style="font-size: 11.5px; color: #1e293b; font-weight: 700;">${destinationLocation || 'Greater Noida'}</div>
             <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Central Distribution Point</div>
           </div>
         `)

@@ -120,8 +120,8 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle>(DEFAULT_VEHICLES[0]); // Heavy Delivery Truck
 
   // Planning Form
-  const [startLocation, setStartLocation] = useState<string>('Noida Sector 62');
-  const [destinationLocation, setDestinationLocation] = useState<string>('Connaught Place, New Delhi');
+  const [startLocation, setStartLocation] = useState<string>('Delhi');
+  const [destinationLocation, setDestinationLocation] = useState<string>('Greater Noida');
   const [routingMode, setRoutingMode] = useState<RoutingMode>('balanced');
   const [departureTime, setDepartureTime] = useState<string>('Now (10:15 AM)');
 
@@ -215,11 +215,21 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
         'route-c': { dist: 41.2, dur: 56, name: 'KALINDI KUNJ GREEN LINK', summary: 'Southern perimeter route with full height clearance' }
       };
     }
-    // Default: Noida Sector 62 -> Connaught Place, New Delhi
+    if (
+      (s.includes('delhi') && (d.includes('greater noida') || d.includes('noida'))) ||
+      ((s.includes('greater noida') || s.includes('noida')) && d.includes('delhi'))
+    ) {
+      return {
+        'route-a': { dist: 42.17, dur: 42, name: 'NOIDA-GREATER NOIDA EXPRESSWAY', summary: 'Direct multi-lane expressway via Sector 126 & Pari Chowk' },
+        'route-b': { dist: 48.07, dur: 45, name: 'REGIONAL RING & VIADUCT BYPASS', summary: 'High-clearance circumferential viaduct (5.2m overhead clearance)' },
+        'route-c': { dist: 45.8, dur: 49, name: 'DADRI ARTERIAL & SURAJPUR CORRIDOR', summary: 'Commercial freight corridor avoiding peak city bottlenecks' }
+      };
+    }
+    // Default: Delhi -> Greater Noida
     return {
-      'route-a': { dist: 19.8, dur: 22, name: 'NH9 ARTERIAL & VIKAS MARG', summary: 'Direct NH9 corridor via Vikas Marg (3.8m Metro Arch)' },
-      'route-b': { dist: 22.3, dur: 25, name: 'OUTER RING BELTWAY & FLYOVER', summary: 'Commercial ring bypass with 4.8m overhead clearance' },
-      'route-c': { dist: 24.2, dur: 28, name: 'ECO-FLOW PARKWAY & VIADUCT', summary: 'Elevated green viaduct minimizing stop-and-go delays' }
+      'route-a': { dist: 42.17, dur: 42, name: 'NOIDA-GREATER NOIDA EXPRESSWAY', summary: 'Direct multi-lane expressway via Sector 126 & Pari Chowk' },
+      'route-b': { dist: 48.07, dur: 45, name: 'REGIONAL RING & VIADUCT BYPASS', summary: 'High-clearance circumferential viaduct (5.2m overhead clearance)' },
+      'route-c': { dist: 45.8, dur: 49, name: 'DADRI ARTERIAL & SURAJPUR CORRIDOR', summary: 'Commercial freight corridor avoiding peak city bottlenecks' }
     };
   };
 
@@ -289,12 +299,15 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
     return rankCandidateRoutes(rawRoutes, mode);
   };
 
-  // Run initial evaluation on mount
+  // Run initial evaluation on mount & fetch live backend GIS journey
   useEffect(() => {
-    const evaluated = evaluateRoutes(selectedVehicle, routingMode, startLocation, destinationLocation);
+    const evaluated = evaluateRoutes(selectedVehicle, routingMode, 'Delhi', 'Greater Noida');
     setCandidateRoutes(evaluated);
     const recommended = evaluated.find(r => r.isRecommended) || evaluated[1] || evaluated[0];
     setSelectedRoute(recommended);
+
+    // Asynchronously call real live OSRM/Weather/Clearance backend
+    runRouteAnalysis('Delhi', 'Greater Noida');
   }, []);
 
   // ─────────────────────────────────────────────────────────────

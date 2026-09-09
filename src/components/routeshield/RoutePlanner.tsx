@@ -92,10 +92,10 @@ export const RoutePlanner: React.FC = () => {
   };
 
   const corridorPresets = [
-    { label: 'Noida ➔ Connaught Place', start: 'Noida Sector 62', dest: 'Connaught Place, New Delhi' },
+    { label: 'Delhi ➔ Greater Noida', start: 'Delhi', dest: 'Greater Noida' },
     { label: 'Greater Noida ➔ Delhi Airport', start: 'Greater Noida Logistics Park', dest: 'Indira Gandhi International Airport, Delhi' },
+    { label: 'Noida ➔ Connaught Place', start: 'Noida Sector 62', dest: 'Connaught Place, New Delhi' },
     { label: 'Cyber City ➔ Central Delhi', start: 'Cyber City, Gurugram', dest: 'Connaught Place, New Delhi' },
-    { label: 'Noida ➔ Delhi Airport', start: 'Noida Sector 62', dest: 'Indira Gandhi International Airport, Delhi' },
     { label: 'Central Hub ➔ North Depot', start: 'Central Warehouse', dest: 'North Distribution Hub' }
   ];
 

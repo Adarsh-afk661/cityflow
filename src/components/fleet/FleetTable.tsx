@@ -89,18 +89,22 @@ export const FleetTable: React.FC = () => {
               <th className="py-2.5 px-3">Max Weight</th>
               <th className="py-2.5 px-3">Assigned Route</th>
               <th className="py-2.5 px-3">Telematics Status</th>
+              <th className="py-2.5 px-3">ETA &amp; Reliability</th>
               <th className="py-2.5 px-3 text-right">Inspect</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 font-mono">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-8 text-center text-slate-400 font-sans text-xs">
+                <td colSpan={9} className="py-8 text-center text-slate-400 font-sans text-xs">
                   No vehicles match the selected operational filters.
                 </td>
               </tr>
             ) : (
               filtered.map(veh => {
+                const isActive = veh.status === 'active';
+                const isDelayed = veh.status === 'delayed';
+
                 return (
                   <tr
                     key={veh.id}
@@ -127,10 +131,26 @@ export const FleetTable: React.FC = () => {
                       {veh.currentRouteName || 'Depot Staging'}
                     </td>
                     <td className="py-3 px-3">
-                      <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 flex items-center space-x-1.5 w-fit">
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                        <span>GPS NOT CONNECTED</span>
-                      </span>
+                      {isActive ? (
+                        <span className="text-[10.5px] font-bold font-mono px-2.5 py-1 rounded-full bg-emerald-50 text-[#166534] border border-emerald-200 flex items-center space-x-1.5 w-fit">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          <span>LIVE · {veh.speedKmh} km/h</span>
+                        </span>
+                      ) : isDelayed ? (
+                        <span className="text-[10.5px] font-bold font-mono px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 flex items-center space-x-1.5 w-fit">
+                          <span className="w-2 h-2 rounded-full bg-amber-500" />
+                          <span>DELAYED · {veh.speedKmh} km/h</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10.5px] font-bold font-mono px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 flex items-center space-x-1.5 w-fit">
+                          <span className="w-2 h-2 rounded-full bg-slate-400" />
+                          <span>STAGING · Standby</span>
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 px-3 font-sans">
+                      <div className="font-bold text-slate-900 leading-tight">{veh.etaMin} min</div>
+                      <div className="text-[10px] text-slate-500 font-mono">{veh.reliabilityScore}% reliability</div>
                     </td>
                     <td className="py-3 px-3 text-right">
                       <button

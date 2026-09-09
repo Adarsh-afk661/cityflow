@@ -166,11 +166,11 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
               ">
                 <span>${veh.type === 'truck' ? '🚚' : veh.type === 'bus' ? '🚌' : '🚐'}</span>
                 <span>${veh.id}</span>
-                <span style="opacity: 0.75; font-size: 8px;">STATIC</span>
+                <span style="opacity: 0.9; font-size: 8.5px; font-weight: 700; color: #bbf7d0;">${veh.speedKmh} km/h</span>
               </div>
             `,
-            iconSize: [90, 22],
-            iconAnchor: [45, 11]
+            iconSize: [95, 22],
+            iconAnchor: [47, 11]
           });
 
           L.marker([vehLat, vehLon], { icon: fleetIcon })
@@ -184,9 +184,10 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
                   <div>Driver: <b>${veh.driver}</b></div>
                   <div>Assigned Route: <b>${veh.currentRouteName || '—'}</b></div>
                   <div>Destination: <b>${veh.destination}</b></div>
-                  <div>Status: <b style="color: ${badgeBg}; text-transform: uppercase;">${veh.status}</b></div>
-                  <div style="margin-top: 6px; padding: 4px 8px; background: #fef3c7; border-radius: 4px; font-size: 10px; color: #92400e;">
-                    ⚠️ GPS TELEMETRY NOT CONNECTED — Last-known position only
+                  <div>Status: <b style="color: ${badgeBg}; text-transform: uppercase;">${veh.status} · ${veh.speedKmh} km/h</b></div>
+                  <div style="margin-top: 6px; padding: 4px 8px; background: #ecfdf5; border-radius: 4px; font-size: 10px; color: #166534; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                    <span style="display:inline-block; width: 6px; height: 6px; border-radius: 50%; background: #166534;"></span>
+                    <span>Live Stream Active · ETA ${veh.etaMin} min · ${veh.reliabilityScore}% rel</span>
                   </div>
                 </div>
               </div>

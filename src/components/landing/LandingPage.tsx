@@ -71,52 +71,88 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) 
             <div className="sim-card">
               <div className="sim-head">
                 <div className="sim-title">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--city-green)" strokeWidth="1.8">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--city-green)" strokeWidth="2">
                     <path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/>
                   </svg>
-                  Noida Sec 62 → Connaught Place
+                  <span style={{ fontWeight: 700 }}>Delhi ➔ Greater Noida Logistics Corridor</span>
                 </div>
-                <div className="live-badge"><span className="dot"></span>Live</div>
+                <div className="live-badge"><span className="dot"></span>Live GIS</div>
               </div>
+
+              {/* Hybrid Spatial-Graph Telemetry Badge */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '7px 12px',
+                borderRadius: '8px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                fontSize: '11px',
+                fontFamily: "'JetBrains Mono', monospace",
+                marginBottom: '12px',
+                color: '#334155'
+              }}>
+                <span style={{ fontWeight: 700, color: 'var(--city-green)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span>🌐</span> HYBRID SPATIAL-GRAPH
+                </span>
+                <span>Direct: <b>34.1 km</b> · Road: <b>42.2 km</b> · Circuity: <b style={{ color: 'var(--city-teal)' }}>1.24x</b></span>
+              </div>
+
               <div className="veh-strip">
                 <div>
-                  <div className="name">Heavy delivery truck</div>
-                  <div className="type">Diesel · 4.2m height class</div>
+                  <div className="name">Heavy Freight Commercial Carrier</div>
+                  <div className="type">Diesel · 4.2m Height Class · 28t GVW</div>
                 </div>
                 <div className="veh-specs">
                   <span className="mono">4.2m H</span>
                   <span className="mono">2.5m W</span>
-                  <span className="mono">16t GVW</span>
+                  <span className="mono">28t GVW</span>
                 </div>
               </div>
+
               <div className="route-mini barred">
-                <span>Route A · Vikas Marg Underpass (3.8m)</span>
+                <span>Route A · Direct Urban Arterial (3.8m Metro Arch)</span>
                 <div className="meta">
-                  <span className="mono">40 min</span>
+                  <span className="mono">42 min</span>
                   <span className="pill-xs barred">Barred</span>
                 </div>
               </div>
+
               <div className="route-mini selected">
-                <span>Route B · Outer Ring Beltway &amp; Flyover</span>
+                <span>Route B · Noida-Gr. Noida Expressway &amp; Viaduct</span>
                 <div className="meta">
-                  <span className="mono">28 min</span>
-                  <span className="pill-xs selected">Selected</span>
+                  <span className="mono">34 min</span>
+                  <span className="pill-xs selected">Recommended</span>
                 </div>
               </div>
-              <div className="route-mini" style={{ opacity: 0.65 }}>
-                <span>Route C · Eco-Flow Parkway</span>
+
+              <div className="route-mini" style={{ opacity: 0.75 }}>
+                <span>Route C · Regional Ring Viaduct Bypass (5.2m Clear)</span>
                 <div className="meta">
-                  <span className="mono">31 min</span>
-                  <span className="pill-xs" style={{ background: 'var(--city-amber-tint)', color: 'var(--city-amber)', fontSize: '9px' }}>Eco</span>
+                  <span className="mono">38 min</span>
+                  <span className="pill-xs" style={{ background: 'var(--city-amber-tint)', color: 'var(--city-amber)', fontSize: '9px' }}>Eco-Flow</span>
                 </div>
               </div>
+
               <div className="sim-map">
-                <svg viewBox="0 0 400 110" width="100%">
-                  <path d="M20 90 C 90 90, 110 20, 180 20 S 300 70, 340 40 S 370 15, 385 15" fill="none" stroke="var(--city-green)" strokeWidth="2.5" strokeLinecap="round"/>
-                  <circle cx="20" cy="90" r="4" fill="var(--city-teal)"/>
-                  <circle cx="385" cy="15" r="4" fill="var(--city-green)"/>
-                  <circle r="4" fill="#fff" stroke="var(--city-green)" strokeWidth="2">
-                    <animateMotion dur="5s" repeatCount="indefinite" path="M20 90 C 90 90, 110 20, 180 20 S 300 70, 340 40 S 370 15, 385 15"/>
+                <svg viewBox="0 0 420 120" width="100%">
+                  {/* Subtle grid reference lines */}
+                  <line x1="20" y1="95" x2="400" y2="95" stroke="#f1f5f9" strokeWidth="1.5" />
+                  <line x1="20" y1="50" x2="400" y2="50" stroke="#f1f5f9" strokeWidth="1.5" strokeDasharray="3 3" />
+                  {/* Recommended path in vibrant emerald */}
+                  <path d="M20 95 C 100 95, 130 30, 210 30 S 320 80, 400 20" fill="none" stroke="var(--city-green)" strokeWidth="3" strokeLinecap="round"/>
+                  {/* Barred path in muted rose dashed */}
+                  <path d="M20 95 C 70 75, 110 85, 150 85" fill="none" stroke="#f43f5e" strokeWidth="2" strokeDasharray="4 4" opacity="0.7"/>
+                  {/* Origin pin (Delhi) */}
+                  <circle cx="20" cy="95" r="5.5" fill="var(--city-teal)" stroke="#ffffff" strokeWidth="2"/>
+                  <text x="20" y="112" fontSize="9.5" fontWeight="700" fill="#475569" textAnchor="middle">Delhi (Origin)</text>
+                  {/* Destination pin (Greater Noida) */}
+                  <circle cx="400" cy="20" r="5.5" fill="var(--city-green)" stroke="#ffffff" strokeWidth="2"/>
+                  <text x="395" y="12" fontSize="9.5" fontWeight="700" fill="#166534" textAnchor="end">Greater Noida (Dest)</text>
+                  {/* Animated vehicle dot moving along the expressway */}
+                  <circle r="4.5" fill="#ffffff" stroke="var(--city-green)" strokeWidth="2.5">
+                    <animateMotion dur="4.5s" repeatCount="indefinite" path="M20 95 C 100 95, 130 30, 210 30 S 320 80, 400 20"/>
                   </circle>
                 </svg>
               </div>
@@ -130,11 +166,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) 
         <div className="wrap">
           <p>Trusted by dispatch teams at</p>
           <div className="logo-row">
-            <span>Metroflow Logistics</span>
-            <span>Harrow Freight</span>
+            <span>Delhi-NCR Express Logistics</span>
+            <span>Harrow Freight India</span>
             <span>Ashford Cold Chain</span>
-            <span>Deacon Distribution</span>
-            <span>Northline Carriers</span>
+            <span>Deacon Intermodal</span>
+            <span>Northline Fleet Carriers</span>
           </div>
         </div>
       </div>
@@ -208,7 +244,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) 
             <div className="quote-avatar">RK</div>
             <div>
               <b>Reema Kapoor</b>
-              <span>Chief dispatcher, Metroflow Logistics</span>
+              <span>Chief Dispatcher, Delhi-NCR Freight Logistics</span>
             </div>
           </div>
         </div>

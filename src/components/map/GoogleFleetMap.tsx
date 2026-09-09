@@ -21,9 +21,12 @@ import {
   Globe2,
   Crosshair,
   Satellite,
-  Car
+  Car,
+  Search,
+  Loader2
 } from 'lucide-react';
 import { useCityFlow } from '../../context/CityFlowContext';
+import { searchLocations } from '../../services/universalGeocoder';
 import { RealTimeOSMMap } from './RealTimeOSMMap';
 
 declare const google: any;
@@ -151,12 +154,15 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
     selectedVehicle,
     startLocation,
     destinationLocation,
+    setDestinationLocation,
     startCoords,
     destCoords,
+    setDestCoords,
     setPointFromMap,
     departureTime,
     googleApiKey,
-    setGoogleApiKey
+    setGoogleApiKey,
+    runRouteAnalysis
   } = useCityFlow();
 
   const [mapError, setMapError] = useState<string | null>(null);
@@ -169,9 +175,61 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
   const [cursorCoords, setCursorCoords] = useState<[number, number] | null>(null);
   const [clickedCoords, setClickedCoords] = useState<[number, number] | null>(null);
 
+  // Map Search Bar states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+
   // Key Modal
   const [keyModalOpen, setKeyModalOpen] = useState(false);
   const [inputKey, setInputKey] = useState(googleApiKey || '');
+
+  // Google Map Search & Geocoding Handler
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    setIsSearching(true);
+    try {
+      const results = await searchLocations(searchQuery);
+      if (results && results.length > 0) {
+        setSearchResults(results);
+        const top = results[0];
+        const newCoords: [number, number] = [top.lat, top.lon];
+
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.panTo({ lat: top.lat, lng: top.lon });
+          mapInstanceRef.current.setZoom(14);
+        }
+
+        // Set destination and calculate all routes connecting origin to this point
+        setDestinationLocation(top.display_name);
+        setDestCoords(newCoords);
+        runRouteAnalysis(startLocation, top.display_name, startCoords || undefined, newCoords);
+      }
+    } catch (err) {
+      console.warn('Google Map search error:', err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSelectResult = (item: any) => {
+    const lat = typeof item.lat === 'string' ? parseFloat(item.lat) : item.lat;
+    const lon = typeof item.lon === 'string' ? parseFloat(item.lon) : item.lon;
+    if (!isNaN(lat) && !isNaN(lon)) {
+      const coords: [number, number] = [lat, lon];
+      setSearchResults([]);
+      setSearchQuery(item.display_name.split(',')[0]);
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.panTo({ lat, lng: lon });
+        mapInstanceRef.current.setZoom(14);
+      }
+      setDestinationLocation(item.display_name);
+      setDestCoords(coords);
+      runRouteAnalysis(startLocation, item.display_name, startCoords || undefined, coords);
+    }
+  };
 
   // Initialize Google Maps JavaScript API
   useEffect(() => {
@@ -570,46 +628,93 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
   return (
     <div className={`relative w-full ${heightClass} bg-[#0f172a] rounded-2xl overflow-hidden border border-slate-800 shadow-lg text-left select-none`}>
       {/* Top Header Controls Bar */}
-      <div className="absolute top-3 left-3 z-20 flex flex-wrap items-center gap-2">
-        <div className="bg-slate-900/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-slate-700 shadow-md text-xs text-white flex items-center space-x-2.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-mono font-bold tracking-wide">GOOGLE MAPS PLATFORM</span>
+      <div className="absolute top-3 left-3 z-20 flex flex-col gap-2 max-w-[calc(100%-80px)] sm:max-w-none pointer-events-auto">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Floating Search Input */}
+          <form onSubmit={handleSearch} className="relative flex items-center shadow-md rounded-xl w-60 sm:w-72">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => {
+                setSearchQuery(e.target.value);
+                if (e.target.value.trim().length >= 2) {
+                  searchLocations(e.target.value).then(setSearchResults);
+                } else {
+                  setSearchResults([]);
+                }
+              }}
+              placeholder="Search destination to route..."
+              className="w-full bg-slate-900/95 text-white backdrop-blur-md border border-slate-700 rounded-xl pl-8 pr-16 py-1.5 text-xs placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 font-medium"
+            />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+            <button
+              type="submit"
+              disabled={isSearching}
+              className="absolute right-1 px-2.5 py-1 rounded-lg bg-[#166534] hover:bg-[#14532d] text-white text-[11px] font-bold transition flex items-center space-x-1 cursor-pointer"
+            >
+              {isSearching ? <Loader2 className="w-3 h-3 animate-spin" /> : <span>Search</span>}
+            </button>
+          </form>
+
+          {/* Live Traffic Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowTraffic(!showTraffic)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md cursor-pointer ${
+              showTraffic
+                ? 'bg-emerald-600/90 text-white border border-emerald-400'
+                : 'bg-slate-900/90 text-slate-300 border border-slate-700 hover:text-white'
+            }`}
+            title="Toggle Google Maps live traffic congestion layer"
+          >
+            <Car className="w-3.5 h-3.5 text-emerald-200" />
+            <span>Traffic {showTraffic ? 'LIVE' : 'OFF'}</span>
+          </button>
+
+          {/* Satellite / Roadmap Switcher */}
+          <button
+            type="button"
+            onClick={() => setMapType(mapType === 'roadmap' ? 'satellite' : 'roadmap')}
+            className="bg-slate-900/90 hover:bg-slate-800 text-slate-200 px-3 py-1.5 rounded-xl border border-slate-700 shadow-md text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer"
+          >
+            <Satellite className="w-3.5 h-3.5 text-blue-400" />
+            <span className="hidden sm:inline">{mapType === 'roadmap' ? 'Satellite' : 'Dark Fleet'}</span>
+          </button>
+
+          {/* API Key Modal Opener */}
+          <button
+            type="button"
+            onClick={() => setKeyModalOpen(true)}
+            className="bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white p-1.5 rounded-xl border border-slate-700 shadow-md transition cursor-pointer"
+            title="Configure Google Maps API Key"
+          >
+            <Key className="w-3.5 h-3.5 text-amber-400" />
+          </button>
         </div>
 
-        {/* Live Traffic Toggle */}
-        <button
-          type="button"
-          onClick={() => setShowTraffic(!showTraffic)}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md cursor-pointer ${
-            showTraffic
-              ? 'bg-emerald-600/90 text-white border border-emerald-400'
-              : 'bg-slate-900/90 text-slate-300 border border-slate-700 hover:text-white'
-          }`}
-          title="Toggle Google Maps live traffic congestion layer"
-        >
-          <Car className="w-3.5 h-3.5 text-emerald-200" />
-          <span>Live Traffic {showTraffic ? 'ON' : 'OFF'}</span>
-        </button>
-
-        {/* Satellite / Roadmap Switcher */}
-        <button
-          type="button"
-          onClick={() => setMapType(mapType === 'roadmap' ? 'satellite' : 'roadmap')}
-          className="bg-slate-900/90 hover:bg-slate-800 text-slate-200 px-3 py-1.5 rounded-xl border border-slate-700 shadow-md text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer"
-        >
-          <Satellite className="w-3.5 h-3.5 text-blue-400" />
-          <span>{mapType === 'roadmap' ? 'Satellite View' : 'Dark Fleet View'}</span>
-        </button>
-
-        {/* API Key Modal Opener */}
-        <button
-          type="button"
-          onClick={() => setKeyModalOpen(true)}
-          className="bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white p-1.5 rounded-xl border border-slate-700 shadow-md transition cursor-pointer"
-          title="Configure Google Maps API Key"
-        >
-          <Key className="w-3.5 h-3.5 text-amber-400" />
-        </button>
+        {/* Search Results Dropdown */}
+        {searchResults.length > 0 && (
+          <div className="bg-slate-900/95 border border-slate-700 rounded-xl shadow-2xl overflow-hidden text-xs max-h-48 overflow-y-auto w-60 sm:w-80 backdrop-blur-md divide-y divide-slate-800">
+            {searchResults.map((item, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => handleSelectResult(item)}
+                className="w-full text-left px-3 py-2 hover:bg-slate-800 border-b border-slate-800 last:border-0 flex items-start space-x-2 text-slate-200 cursor-pointer"
+              >
+                <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="truncate">
+                  <div className="font-bold text-white truncate">{item.display_name}</div>
+                  <div className="text-[10px] text-slate-400 flex items-center space-x-1">
+                    <span>{item.area}</span>
+                    <span>·</span>
+                    <span className="font-mono text-emerald-400">{item.lat.toFixed(4)}, {item.lon.toFixed(4)}</span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Floating Clicked Coordinates Card (Set Origin / Destination) */}

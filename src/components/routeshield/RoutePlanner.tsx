@@ -19,6 +19,7 @@ import { useCityFlow } from '../../context/CityFlowContext';
 import { RoutingMode } from '../../types';
 import { CustomVehicleModal } from './CustomVehicleModal';
 import { searchDelhiPlaces, PlaceItem, DELHI_NCR_PLACES } from '../../services/delhiPlaces';
+import { searchLocations, resolveLocationCoordinates } from '../../services/universalGeocoder';
 
 export const RoutePlanner: React.FC = () => {
   const {
@@ -72,7 +73,7 @@ export const RoutePlanner: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
-  // Hybrid Real-Time Geocoding: Instant Delhi NCR Catalog + Global Nominatim
+  // Hybrid Real-Time Geocoding: Instant Delhi NCR Catalog + Global Nominatim + Google Maps
   const searchGeocode = async (query: string, type: 'start' | 'dest') => {
     if (query.trim().length < 2) {
       if (type === 'start') setStartSuggestions([]);
@@ -80,46 +81,13 @@ export const RoutePlanner: React.FC = () => {
       return;
     }
 
-    // 1. Instant Delhi NCR high-precision matches
-    const localMatches = searchDelhiPlaces(query, 6).map(p => ({
-      display_name: p.name,
-      area: p.area,
-      category: p.category,
-      lat: p.lat,
-      lon: p.lon,
-      isDelhiLocal: true
-    }));
-
-    if (type === 'start') setStartSuggestions(localMatches);
-    else setDestSuggestions(localMatches);
-
-    // 2. Fetch live Nominatim / server geocode for any other arbitrary world/NCR locations
     try {
-      const res = await fetch(`/api/map/geocode?q=${encodeURIComponent(query)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          const formatted = data.map((item: any) => ({
-            display_name: item.display_name || item.name,
-            area: item.address?.state || item.address?.city || 'Geocoded Address',
-            category: (item.category || 'landmark') as any,
-            lat: parseFloat(item.lat),
-            lon: parseFloat(item.lon),
-            isDelhiLocal: false
-          }));
-
-          const merged = [...localMatches];
-          for (const item of formatted) {
-            if (!merged.some(m => Math.abs(m.lat - item.lat) < 0.005 && Math.abs(m.lon - item.lon) < 0.005)) {
-              merged.push(item);
-            }
-          }
-
-          if (type === 'start') setStartSuggestions(merged.slice(0, 8));
-          else setDestSuggestions(merged.slice(0, 8));
-        }
-      }
-    } catch (e) {}
+      const results = await searchLocations(query);
+      if (type === 'start') setStartSuggestions(results);
+      else setDestSuggestions(results);
+    } catch (err) {
+      console.warn('Geocode search error:', err);
+    }
   };
 
   const handleSwap = () => {
@@ -139,19 +107,26 @@ export const RoutePlanner: React.FC = () => {
     setActiveDropdown(null);
   };
 
-  // Select a suggestion with exact coordinates
+  // Select a suggestion with exact coordinates and immediately recalculate routes
   const handleSelectSuggestion = (item: any, type: 'start' | 'dest') => {
     const lat = typeof item.lat === 'string' ? parseFloat(item.lat) : item.lat;
     const lon = typeof item.lon === 'string' ? parseFloat(item.lon) : item.lon;
+    const coords: [number, number] | null = (!isNaN(lat) && !isNaN(lon)) ? [lat, lon] : null;
 
     if (type === 'start') {
       setStartLocation(item.display_name);
       setStartQuery(item.display_name);
-      if (!isNaN(lat) && !isNaN(lon)) setStartCoords([lat, lon]);
+      if (coords) {
+        setStartCoords(coords);
+        runRouteAnalysis(item.display_name, destinationLocation, coords, destCoords || undefined);
+      }
     } else {
       setDestinationLocation(item.display_name);
       setDestQuery(item.display_name);
-      if (!isNaN(lat) && !isNaN(lon)) setDestCoords([lat, lon]);
+      if (coords) {
+        setDestCoords(coords);
+        runRouteAnalysis(startLocation, item.display_name, startCoords || undefined, coords);
+      }
     }
     setActiveDropdown(null);
   };
@@ -216,25 +191,27 @@ export const RoutePlanner: React.FC = () => {
     { id: 'balanced', label: 'Balanced', desc: 'Optimal multi-criteria weighting' }
   ];
 
-  const handleUseCustomTyped = (type: 'start' | 'dest') => {
+  const handleUseCustomTyped = async (type: 'start' | 'dest') => {
     if (type === 'start') {
       const clean = startQuery.trim();
       if (!clean) return;
-      setStartLocation(clean);
-      setStartCoords(null);
       setActiveDropdown(null);
-      runRouteAnalysis(clean, destinationLocation, undefined, destCoords || undefined);
+      const res = await resolveLocationCoordinates(clean, startCoords || [28.6328, 77.2197]);
+      setStartLocation(clean);
+      setStartCoords(res.coords);
+      runRouteAnalysis(clean, destinationLocation, res.coords, destCoords || undefined);
     } else {
       const clean = destQuery.trim();
       if (!clean) return;
-      setDestinationLocation(clean);
-      setDestCoords(null);
       setActiveDropdown(null);
-      runRouteAnalysis(startLocation, clean, startCoords || undefined, undefined);
+      const res = await resolveLocationCoordinates(clean, destCoords || [28.4744, 77.5040]);
+      setDestinationLocation(clean);
+      setDestCoords(res.coords);
+      runRouteAnalysis(startLocation, clean, startCoords || undefined, res.coords);
     }
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     setFormError(null);
     const sLoc = (startQuery || startLocation).trim();
     const dLoc = (destQuery || destinationLocation).trim();
@@ -252,19 +229,18 @@ export const RoutePlanner: React.FC = () => {
       return;
     }
 
-    const sChanged = sLoc !== startLocation;
-    const dChanged = dLoc !== destinationLocation;
-
-    setStartLocation(sLoc);
-    setDestinationLocation(dLoc);
     setActiveDropdown(null);
 
-    runRouteAnalysis(
-      sLoc,
-      dLoc,
-      sChanged ? undefined : (startCoords || undefined),
-      dChanged ? undefined : (destCoords || undefined)
-    );
+    // Resolve both coordinates accurately using universal geocoder
+    const sRes = await resolveLocationCoordinates(sLoc, startCoords || [28.6328, 77.2197]);
+    const dRes = await resolveLocationCoordinates(dLoc, destCoords || [28.4744, 77.5040]);
+
+    setStartLocation(sLoc);
+    setStartCoords(sRes.coords);
+    setDestinationLocation(dLoc);
+    setDestCoords(dRes.coords);
+
+    runRouteAnalysis(sLoc, dLoc, sRes.coords, dRes.coords);
   };
 
   return (

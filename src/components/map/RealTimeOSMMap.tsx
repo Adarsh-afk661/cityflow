@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useCityFlow } from '../../context/CityFlowContext';
 import { CandidateRoute } from '../../types';
+import { searchLocations } from '../../services/universalGeocoder';
 
 // Helper to calculate geographic bearing angle (0-360 degrees) between two points
 const getBearingAngle = (p1: [number, number], p2: [number, number]): number => {
@@ -82,12 +83,15 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
     selectedVehicle,
     startLocation,
     destinationLocation,
+    setDestinationLocation,
     startCoords,
     destCoords,
+    setDestCoords,
     setPointFromMap,
     departureTime,
     fleet,
-    cityZones
+    cityZones,
+    runRouteAnalysis
   } = useCityFlow();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -915,18 +919,23 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
 
     setIsSearching(true);
     try {
-      const res = await fetch(`/api/map/geocode?q=${encodeURIComponent(searchQuery)}`);
-      const results = await res.json();
+      const results = await searchLocations(searchQuery);
 
       if (results && results.length > 0) {
         setSearchResults(results);
         const top = results[0];
-        const newLat = parseFloat(top.lat);
-        const newLon = parseFloat(top.lon);
+        const newLat = top.lat;
+        const newLon = top.lon;
+        const coords: [number, number] = [newLat, newLon];
 
-        if (!isNaN(newLat) && !isNaN(newLon) && mapInstanceRef.current) {
-          mapInstanceRef.current.flyTo([newLat, newLon], 14, { duration: 1.5 });
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.flyTo(coords, 14, { duration: 1.2 });
         }
+
+        // Set destination and calculate all routes connecting origin to this point
+        setDestinationLocation(top.display_name);
+        setDestCoords(coords);
+        runRouteAnalysis(startLocation, top.display_name, startCoords || undefined, coords);
       }
     } catch (err) {
       console.warn('Geocoding search error:', err);
@@ -936,14 +945,19 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
   };
 
   const handleSelectResult = (item: any) => {
-    const lat = parseFloat(item.lat);
-    const lon = parseFloat(item.lon);
+    const lat = typeof item.lat === 'string' ? parseFloat(item.lat) : item.lat;
+    const lon = typeof item.lon === 'string' ? parseFloat(item.lon) : item.lon;
     if (!isNaN(lat) && !isNaN(lon)) {
+      const coords: [number, number] = [lat, lon];
       setSearchResults([]);
       setSearchQuery(item.display_name.split(',')[0]);
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.flyTo([lat, lon], 14, { duration: 1.2 });
+        mapInstanceRef.current.flyTo(coords, 14, { duration: 1.2 });
       }
+
+      setDestinationLocation(item.display_name);
+      setDestCoords(coords);
+      runRouteAnalysis(startLocation, item.display_name, startCoords || undefined, coords);
     }
   };
 
@@ -1000,7 +1014,14 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
             <input
               type="text"
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={e => {
+                setSearchQuery(e.target.value);
+                if (e.target.value.trim().length >= 2) {
+                  searchLocations(e.target.value).then(setSearchResults);
+                } else {
+                  setSearchResults([]);
+                }
+              }}
               placeholder="Search address or location..."
               className="w-full bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl pl-8 pr-16 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#166534] font-medium"
             />

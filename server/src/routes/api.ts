@@ -655,6 +655,8 @@ const handleJourneyAnalysis = async (req: Request, res: Response) => {
     const {
       start = 'Greater Noida',
       destination = 'Delhi Airport',
+      startCoords,
+      destCoords,
       vehicle = {
         id: 'veh-heavy-truck',
         name: 'Heavy Delivery Truck',
@@ -673,9 +675,14 @@ const handleJourneyAnalysis = async (req: Request, res: Response) => {
     const vLength = Number(vehicle.length) || 12.0;
     const vFuel = vehicle.fuelType || 'diesel';
 
-    // 1. Geocode Start & Destination
-    const originGeocode = await geocodeLocation(start);
-    const destGeocode = await geocodeLocation(destination);
+    // 1. Geocode Start & Destination or use exact supplied coordinates
+    const originGeocode = (startCoords && Array.isArray(startCoords) && !isNaN(Number(startCoords[0])))
+      ? { displayName: start, lat: Number(startCoords[0]), lon: Number(startCoords[1]), source: 'Client Specific Coordinates' }
+      : await geocodeLocation(start);
+
+    const destGeocode = (destCoords && Array.isArray(destCoords) && !isNaN(Number(destCoords[0])))
+      ? { displayName: destination, lat: Number(destCoords[0]), lon: Number(destCoords[1]), source: 'Client Specific Coordinates' }
+      : await geocodeLocation(destination);
 
     // 2. Fetch Live Driving Routes from OSRM
     const routingResult = await fetchLiveDrivingRoutes(

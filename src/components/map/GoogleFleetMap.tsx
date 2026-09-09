@@ -16,7 +16,12 @@ import {
   ChevronDown,
   ChevronUp,
   Sparkles,
-  Info
+  Info,
+  Key,
+  Globe2,
+  Crosshair,
+  Satellite,
+  Car
 } from 'lucide-react';
 import { useCityFlow } from '../../context/CityFlowContext';
 import { RealTimeOSMMap } from './RealTimeOSMMap';
@@ -137,6 +142,7 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
   const mapInstanceRef = useRef<any>(null);
   const polylinesRef = useRef<any[]>([]);
   const markersRef = useRef<any[]>([]);
+  const trafficLayerRef = useRef<any>(null);
 
   const {
     candidateRoutes,
@@ -145,19 +151,32 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
     selectedVehicle,
     startLocation,
     destinationLocation,
-    departureTime
+    startCoords,
+    destCoords,
+    setPointFromMap,
+    departureTime,
+    googleApiKey,
+    setGoogleApiKey
   } = useCityFlow();
 
   const [mapError, setMapError] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [navCardExpanded, setNavCardExpanded] = useState(true);
+  const [showTraffic, setShowTraffic] = useState(true);
+  const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('roadmap');
 
-  const googleApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || (typeof window !== 'undefined' ? localStorage.getItem('CITYFLOW_GOOGLE_MAPS_KEY') || '' : '');
+  // Interactive coordinate states
+  const [cursorCoords, setCursorCoords] = useState<[number, number] | null>(null);
+  const [clickedCoords, setClickedCoords] = useState<[number, number] | null>(null);
+
+  // Key Modal
+  const [keyModalOpen, setKeyModalOpen] = useState(false);
+  const [inputKey, setInputKey] = useState(googleApiKey || '');
 
   // Initialize Google Maps JavaScript API
   useEffect(() => {
     if (!googleApiKey) {
-      setMapError('VITE_GOOGLE_MAPS_API_KEY not configured');
+      setMapError('Google Maps API key not provided');
       return;
     }
 
@@ -173,15 +192,38 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
         const mapsLib = (await importLibrary('maps')) as any;
         if (!isMounted || !mapContainerRef.current) return;
 
+        const defaultCenter = startCoords ? { lat: startCoords[0], lng: startCoords[1] } : { lat: 28.6328, lng: 77.2197 };
+
         const map = new mapsLib.Map(mapContainerRef.current, {
-          center: { lat: 28.6139, lng: 77.2090 },
+          center: defaultCenter,
           zoom: 12,
-          styles: DARK_FLEET_MAP_STYLES,
+          styles: mapType === 'roadmap' ? DARK_FLEET_MAP_STYLES : [],
+          mapTypeId: mapType === 'roadmap' ? 'roadmap' : 'satellite',
           disableDefaultUI: false,
           zoomControl: true,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: true
+        });
+
+        // Add Traffic Layer
+        trafficLayerRef.current = new google.maps.TrafficLayer();
+        if (showTraffic) {
+          trafficLayerRef.current.setMap(map);
+        }
+
+        // Add mousemove coordinates listener
+        map.addListener('mousemove', (e: any) => {
+          if (e.latLng) {
+            setCursorCoords([+e.latLng.lat().toFixed(4), +e.latLng.lng().toFixed(4)]);
+          }
+        });
+
+        // Add click listener for coordinate selection
+        map.addListener('click', (e: any) => {
+          if (e.latLng) {
+            setClickedCoords([+e.latLng.lat().toFixed(5), +e.latLng.lng().toFixed(5)]);
+          }
         });
 
         mapInstanceRef.current = map;
@@ -200,9 +242,16 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
       polylinesRef.current.forEach(p => p.setMap(null));
       markersRef.current.forEach(m => m.setMap(null));
     };
-  }, [googleApiKey]);
+  }, [googleApiKey, mapType]);
 
-  // Render Candidate Routes & Synchronize Markers
+  // Toggle traffic layer
+  useEffect(() => {
+    if (trafficLayerRef.current && mapInstanceRef.current) {
+      trafficLayerRef.current.setMap(showTraffic ? mapInstanceRef.current : null);
+    }
+  }, [showTraffic, isLoaded]);
+
+  // Render Candidate Routes & Synchronize Draggable Markers
   useEffect(() => {
     if (!isLoaded || !mapInstanceRef.current || typeof google === 'undefined') return;
     const map = mapInstanceRef.current;
@@ -248,7 +297,7 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
 
       if (isFailed) {
         strokeColor = '#ef4444';
-        strokeWeight = 3;
+        strokeWeight = 3.5;
         strokeOpacity = 0.85;
         zIndex = 1;
       } else if (isSelected) {
@@ -258,7 +307,7 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
         zIndex = 10;
       } else if (route.isRecommended) {
         strokeColor = '#3b82f6';
-        strokeWeight = 4;
+        strokeWeight = 4.5;
         strokeOpacity = 0.8;
         zIndex = 5;
       }
@@ -292,135 +341,170 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
       polylinesRef.current.push(polyline);
     });
 
-    // 2. Add Origin and Destination Markers
+    // 2. Add Draggable Origin (A) and Destination (B) Markers
     const primaryRoute = selectedRoute || candidateRoutes[0];
     const waypoints = (primaryRoute as any).realCoordinates || [];
-    if (waypoints.length > 1) {
-      const originPt = { lat: waypoints[0][1], lng: waypoints[0][0] };
-      const destPt = { lat: waypoints[waypoints.length - 1][1], lng: waypoints[waypoints.length - 1][0] };
-      const journeyTimes = calculateJourneyTimes(departureTime, primaryRoute.currentEtaMin);
 
-      const originMarker = new google.maps.Marker({
-        position: originPt,
-        map,
-        title: `Pickup Point: ${startLocation}`,
-        label: { text: 'A', color: '#ffffff', fontWeight: 'bold' },
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 14,
-          fillColor: '#166534',
-          fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 2
-        }
-      });
+    const originPt = startCoords
+      ? { lat: startCoords[0], lng: startCoords[1] }
+      : waypoints.length > 0
+      ? { lat: waypoints[0][1], lng: waypoints[0][0] }
+      : { lat: 28.6328, lng: 77.2197 };
 
-      const originInfo = new google.maps.InfoWindow({
-        content: `
-          <div style="font-family: sans-serif; min-width: 220px; padding: 4px; color: #0f172a;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid #bbf7d0; padding-bottom: 4px;">
-              <strong style="color: #166534; font-size: 12px;">PICKUP LOCATION (START)</strong>
-              <span style="font-size: 10px; font-weight: bold; background: #dcfce7; color: #166534; padding: 1px 6px; border-radius: 4px;">STOP A</span>
-            </div>
-            <div style="font-size: 13px; font-weight: bold; margin-bottom: 5px;">${startLocation || 'Delhi Hub'}</div>
-            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 5px 8px; margin-bottom: 4px;">
-              <span style="font-size: 11px; color: #166534;">🕒 <b>Pickup Time:</b> ${journeyTimes.pickupTime}</span>
-            </div>
-            <div style="font-size: 10px; color: #64748b;">Journey commences towards ${destinationLocation || 'destination'}</div>
-          </div>
-        `
-      });
-      originMarker.addListener('click', () => originInfo.open(map, originMarker));
-      markersRef.current.push(originMarker);
+    const destPt = destCoords
+      ? { lat: destCoords[0], lng: destCoords[1] }
+      : waypoints.length > 1
+      ? { lat: waypoints[waypoints.length - 1][1], lng: waypoints[waypoints.length - 1][0] }
+      : { lat: 28.4744, lng: 77.5040 };
 
-      const destMarker = new google.maps.Marker({
-        position: destPt,
-        map,
-        title: `Drop-off Point: ${destinationLocation}`,
-        label: { text: 'B', color: '#ffffff', fontWeight: 'bold' },
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 14,
-          fillColor: '#b91c1c',
-          fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 2
-        }
-      });
+    bounds.extend(originPt);
+    bounds.extend(destPt);
 
-      const destInfo = new google.maps.InfoWindow({
-        content: `
-          <div style="font-family: sans-serif; min-width: 220px; padding: 4px; color: #0f172a;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid #fecaca; padding-bottom: 4px;">
-              <strong style="color: #b91c1c; font-size: 12px;">DROP-OFF LOCATION (DEST)</strong>
-              <span style="font-size: 10px; font-weight: bold; background: #fee2e2; color: #b91c1c; padding: 1px 6px; border-radius: 4px;">STOP B</span>
-            </div>
-            <div style="font-size: 13px; font-weight: bold; margin-bottom: 5px;">${destinationLocation || 'Greater Noida Hub'}</div>
-            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 5px 8px; margin-bottom: 4px;">
-              <span style="font-size: 11px; color: #b91c1c;">🏁 <b>Expected Drop Time:</b> ${journeyTimes.dropoffTime}</span>
-            </div>
-            <div style="font-size: 10px; color: #64748b;">Estimated Transit: <b>${primaryRoute.currentEtaMin} min</b> (${primaryRoute.distanceKm} km)</div>
-          </div>
-        `
-      });
-      destMarker.addListener('click', () => destInfo.open(map, destMarker));
-      markersRef.current.push(destMarker);
+    const pinTimes = calculateJourneyTimes(departureTime, primaryRoute.currentEtaMin);
 
-      // 3. Render physical clearance checkpoint violation marker ONLY if vehicle physically breaches infrastructure
-      candidateRoutes.forEach(r => {
-        if (r.clearanceStatus === 'failed' && r.clearanceChecks) {
-          const failedCheck = r.clearanceChecks.find(c => !c.passed);
-          if (failedCheck && (r as any).realCoordinates && (r as any).realCoordinates.length > 2) {
-            const midIdx = Math.floor((r as any).realCoordinates.length / 2);
-            const breachPt = {
-              lat: (r as any).realCoordinates[midIdx][1],
-              lng: (r as any).realCoordinates[midIdx][0]
-            };
+    // Draggable Origin Marker (A)
+    const originMarker = new google.maps.Marker({
+      position: originPt,
+      map,
+      draggable: true,
+      title: `Origin: ${startLocation} (Drag anywhere on map to reposition)`,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 14,
+        fillColor: '#166534',
+        fillOpacity: 1,
+        strokeColor: '#ffffff',
+        strokeWeight: 3
+      },
+      label: {
+        text: 'A',
+        color: '#ffffff',
+        fontWeight: 'bold',
+        fontSize: '12px'
+      }
+    });
 
-            const breachMarker = new google.maps.Marker({
-              position: breachPt,
-              map,
-              title: `Clearance Breach: ${failedCheck.infrastructureName}`,
-              label: { text: '⛔', fontSize: '14px' },
-              icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 14,
-                fillColor: '#dc2626',
-                fillOpacity: 0.95,
-                strokeColor: '#ffffff',
-                strokeWeight: 2
-              }
-            });
+    const originInfo = new google.maps.InfoWindow({
+      content: `
+        <div style="font-family: inherit; min-width: 210px; padding: 4px; color: #0f172a;">
+          <div style="font-weight: 800; color: #166534; font-size: 12px; margin-bottom: 3px;">📍 ORIGIN / PICKUP (STOP A)</div>
+          <div style="font-size: 13px; font-weight: 700; margin-bottom: 4px;">${startLocation || 'Origin'}</div>
+          <div style="font-size: 11px; color: #475569; margin-bottom: 2px;">⏰ Pickup: <b>${pinTimes.pickupTime}</b></div>
+          <div style="font-size: 10px; color: #64748b; font-family: monospace;">GPS: ${originPt.lat.toFixed(4)}, ${originPt.lng.toFixed(4)}</div>
+          <div style="font-size: 10px; color: #047857; margin-top: 4px; font-weight: 600;">✨ Drag marker to reposition origin</div>
+        </div>
+      `
+    });
 
-            const breachInfo = new google.maps.InfoWindow({
-              content: `
-                <div style="color: #0f172a; font-family: sans-serif; padding: 4px;">
-                  <strong style="color: #dc2626; font-size: 12px;">⛔ PHYSICAL CLEARANCE BREACH</strong><br/>
-                  <span style="font-size: 11px;">${failedCheck.infrastructureName} (${failedCheck.infrastructureType})</span><br/>
-                  <span style="font-size: 11px; color: #b91c1c; font-weight: bold;">${failedCheck.failureReason || 'Exceeds vehicle height limit'}</span>
-                </div>
-              `
-            });
-            breachMarker.addListener('click', () => {
-              breachInfo.open(map, breachMarker);
-            });
-            markersRef.current.push(breachMarker);
-          }
-        }
-      });
-    }
+    originMarker.addListener('click', () => {
+      originInfo.open(map, originMarker);
+    });
 
-    // Smoothly fit map to entire route bounds
+    originMarker.addListener('dragend', (e: any) => {
+      if (e.latLng) {
+        const newLat = +e.latLng.lat().toFixed(5);
+        const newLng = +e.latLng.lng().toFixed(5);
+        setPointFromMap('start', [newLat, newLng]);
+      }
+    });
+
+    markersRef.current.push(originMarker);
+
+    // Draggable Destination Marker (B)
+    const destMarker = new google.maps.Marker({
+      position: destPt,
+      map,
+      draggable: true,
+      title: `Destination: ${destinationLocation} (Drag anywhere on map to reposition)`,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 14,
+        fillColor: '#b91c1c',
+        fillOpacity: 1,
+        strokeColor: '#ffffff',
+        strokeWeight: 3
+      },
+      label: {
+        text: 'B',
+        color: '#ffffff',
+        fontWeight: 'bold',
+        fontSize: '12px'
+      }
+    });
+
+    const destInfo = new google.maps.InfoWindow({
+      content: `
+        <div style="font-family: inherit; min-width: 210px; padding: 4px; color: #0f172a;">
+          <div style="font-weight: 800; color: #b91c1c; font-size: 12px; margin-bottom: 3px;">🏁 DESTINATION / DROP-OFF (STOP B)</div>
+          <div style="font-size: 13px; font-weight: 700; margin-bottom: 4px;">${destinationLocation || 'Destination'}</div>
+          <div style="font-size: 11px; color: #475569; margin-bottom: 2px;">🏁 Drop: <b>${pinTimes.dropoffTime}</b></div>
+          <div style="font-size: 10px; color: #64748b; font-family: monospace;">GPS: ${destPt.lat.toFixed(4)}, ${destPt.lng.toFixed(4)}</div>
+          <div style="font-size: 10px; color: #b91c1c; margin-top: 4px; font-weight: 600;">✨ Drag marker to reposition destination</div>
+        </div>
+      `
+    });
+
+    destMarker.addListener('click', () => {
+      destInfo.open(map, destMarker);
+    });
+
+    destMarker.addListener('dragend', (e: any) => {
+      if (e.latLng) {
+        const newLat = +e.latLng.lat().toFixed(5);
+        const newLng = +e.latLng.lng().toFixed(5);
+        setPointFromMap('dest', [newLat, newLng]);
+      }
+    });
+
+    markersRef.current.push(destMarker);
+
+    // Smoothly fit map to bounds
     if (!bounds.isEmpty()) {
-      map.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
+      map.fitBounds(bounds, { top: 70, right: 70, bottom: 70, left: 70 });
     }
-  }, [isLoaded, candidateRoutes, selectedRoute, selectedVehicle, startLocation, destinationLocation, departureTime]);
+  }, [isLoaded, candidateRoutes, selectedRoute, selectedVehicle, startLocation, destinationLocation, startCoords, destCoords, departureTime]);
 
-  // If Google Maps API key is not configured or fails to load, gracefully fall back to live OpenStreetMap
+  const handleSaveKey = () => {
+    if (inputKey.trim()) {
+      setGoogleApiKey(inputKey.trim());
+      setKeyModalOpen(false);
+      setMapError(null);
+    }
+  };
+
+  // If Google Maps API key is not configured, show dual-action container with OpenStreetMap
   if (mapError || !googleApiKey) {
     return (
-      <div className="relative w-full h-full text-left">
-        <RealTimeOSMMap heightClass="h-full" showJourneyRoutes={showJourneyRoutes} />
+      <div className={`relative w-full ${heightClass} bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-md text-left`}>
+        {/* Google Maps Setup Bar */}
+        <div className="bg-slate-900 text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 z-30 relative">
+          <div className="flex items-center space-x-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping inline-block" />
+            <span className="text-xs font-bold text-slate-200">Google Maps Platform API Ready</span>
+            <span className="text-[11px] text-slate-400 hidden sm:inline">— Paste your key for satellite, 3D and traffic vector rendering</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <input
+              type="text"
+              value={inputKey}
+              onChange={e => setInputKey(e.target.value)}
+              placeholder="Paste Google Maps API Key..."
+              className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder:text-slate-500 font-mono focus:outline-none focus:border-emerald-500 w-44 sm:w-60"
+            />
+            <button
+              type="button"
+              onClick={handleSaveKey}
+              className="px-3 py-1 bg-[#166534] hover:bg-[#14532d] text-white text-xs font-bold rounded-lg transition cursor-pointer"
+            >
+              Activate
+            </button>
+          </div>
+        </div>
+
+        {/* Fallback to interactive OpenStreetMap */}
+        <div className="w-full h-[calc(100%-42px)]">
+          <RealTimeOSMMap heightClass="h-full" showJourneyRoutes={showJourneyRoutes} />
+        </div>
       </div>
     );
   }
@@ -430,14 +514,92 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
 
   return (
     <div className={`relative w-full ${heightClass} bg-[#0f172a] rounded-2xl overflow-hidden border border-slate-800 shadow-lg text-left select-none`}>
-      <div className="absolute top-3 left-3 z-20 bg-slate-900/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-slate-700 shadow-md text-xs text-white flex items-center space-x-3">
-        <div className="flex items-center space-x-2">
+      {/* Top Header Controls Bar */}
+      <div className="absolute top-3 left-3 z-20 flex flex-wrap items-center gap-2">
+        <div className="bg-slate-900/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-slate-700 shadow-md text-xs text-white flex items-center space-x-2.5">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           <span className="font-mono font-bold tracking-wide">GOOGLE MAPS PLATFORM</span>
         </div>
-        <span className="text-slate-500">|</span>
-        <span className="text-slate-300 text-[11px]">Direction Guidance Active</span>
+
+        {/* Live Traffic Toggle */}
+        <button
+          type="button"
+          onClick={() => setShowTraffic(!showTraffic)}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md cursor-pointer ${
+            showTraffic
+              ? 'bg-emerald-600/90 text-white border border-emerald-400'
+              : 'bg-slate-900/90 text-slate-300 border border-slate-700 hover:text-white'
+          }`}
+          title="Toggle Google Maps live traffic congestion layer"
+        >
+          <Car className="w-3.5 h-3.5 text-emerald-200" />
+          <span>Live Traffic {showTraffic ? 'ON' : 'OFF'}</span>
+        </button>
+
+        {/* Satellite / Roadmap Switcher */}
+        <button
+          type="button"
+          onClick={() => setMapType(mapType === 'roadmap' ? 'satellite' : 'roadmap')}
+          className="bg-slate-900/90 hover:bg-slate-800 text-slate-200 px-3 py-1.5 rounded-xl border border-slate-700 shadow-md text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer"
+        >
+          <Satellite className="w-3.5 h-3.5 text-blue-400" />
+          <span>{mapType === 'roadmap' ? 'Satellite View' : 'Dark Fleet View'}</span>
+        </button>
+
+        {/* API Key Modal Opener */}
+        <button
+          type="button"
+          onClick={() => setKeyModalOpen(true)}
+          className="bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white p-1.5 rounded-xl border border-slate-700 shadow-md transition cursor-pointer"
+          title="Configure Google Maps API Key"
+        >
+          <Key className="w-3.5 h-3.5 text-amber-400" />
+        </button>
       </div>
+
+      {/* Floating Clicked Coordinates Card (Set Origin / Destination) */}
+      {clickedCoords && (
+        <div className="absolute top-16 left-3 z-30 bg-slate-900/95 backdrop-blur-md p-3 rounded-2xl border border-emerald-500 shadow-2xl text-white space-y-2 animate-in fade-in zoom-in-95 duration-150">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center space-x-1.5 text-emerald-400 font-bold text-xs">
+              <Crosshair className="w-3.5 h-3.5" />
+              <span>Map Point Selected</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setClickedCoords(null)}
+              className="text-slate-400 hover:text-white text-xs cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="font-mono text-xs text-slate-200 bg-slate-800 px-2 py-1 rounded-md">
+            Lat: {clickedCoords[0]}°, Lng: {clickedCoords[1]}°
+          </div>
+          <div className="flex items-center space-x-2 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setPointFromMap('start', clickedCoords);
+                setClickedCoords(null);
+              }}
+              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
+            >
+              <span>Set as Origin (A)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPointFromMap('dest', clickedCoords);
+                setClickedCoords(null);
+              }}
+              className="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
+            >
+              <span>Set as Dest (B)</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Google Maps Style Journey Navigation & Timing Card */}
       {showJourneyRoutes && primaryRoute && journeyTimes && (
@@ -470,10 +632,9 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
             </button>
           </div>
 
-          {/* Expanded Journey Details (From -> To & Pick/Drop Timings) */}
+          {/* Expanded Journey Details */}
           {navCardExpanded && (
             <div className="p-3.5 space-y-3 text-xs bg-white/95">
-              {/* Route Path (Pickup & Drop-off Timings) */}
               <div className="relative pl-6 space-y-3 before:absolute before:left-2.5 before:top-2.5 before:bottom-2.5 before:w-0.5 before:bg-slate-200">
                 {/* Pickup / Origin */}
                 <div className="relative">
@@ -481,15 +642,15 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
                     <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
                   </span>
                   <div className="flex items-center justify-between gap-2">
-                    <div className="font-bold text-slate-900 text-[12px] truncate max-w-[170px]" title={startLocation || 'Pickup Location'}>
-                      {startLocation || 'Delhi Hub'}
+                    <div className="font-bold text-slate-900 text-[12px] truncate max-w-[170px]" title={startLocation}>
+                      {startLocation || 'Pickup'}
                     </div>
                     <div className="shrink-0 font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 font-mono text-[11px] flex items-center space-x-1">
                       <Clock className="w-3 h-3 text-emerald-600" />
                       <span>Pickup: {journeyTimes.pickupTime}</span>
                     </div>
                   </div>
-                  <div className="text-[10px] text-slate-500 font-medium">Origin · Start of Journey</div>
+                  <div className="text-[10px] text-slate-500 font-medium">Origin · Stop A (Drag pin to move)</div>
                 </div>
 
                 {/* Drop-off / Destination */}
@@ -498,15 +659,15 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
                     <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
                   </span>
                   <div className="flex items-center justify-between gap-2">
-                    <div className="font-bold text-slate-900 text-[12px] truncate max-w-[170px]" title={destinationLocation || 'Drop-off Destination'}>
-                      {destinationLocation || 'Greater Noida Hub'}
+                    <div className="font-bold text-slate-900 text-[12px] truncate max-w-[170px]" title={destinationLocation}>
+                      {destinationLocation || 'Destination'}
                     </div>
                     <div className="shrink-0 font-bold text-rose-800 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 font-mono text-[11px] flex items-center space-x-1">
                       <Clock className="w-3 h-3 text-rose-600" />
                       <span>Drop: {journeyTimes.dropoffTime}</span>
                     </div>
                   </div>
-                  <div className="text-[10px] text-slate-500 font-medium">Destination · Expected Arrival</div>
+                  <div className="text-[10px] text-slate-500 font-medium">Destination · Stop B (Drag pin to move)</div>
                 </div>
               </div>
 
@@ -526,30 +687,89 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
         </div>
       )}
 
+      {/* Map Canvas Container */}
       <div ref={mapContainerRef} className="w-full h-full" />
 
-      <div className="absolute bottom-3 left-3 z-20 bg-slate-900/90 backdrop-blur-md p-2.5 rounded-xl border border-slate-700 shadow-md text-[11px] text-slate-300 flex flex-wrap items-center gap-3 font-mono">
-        <div className="flex items-center space-x-2">
-          <span className="w-3 h-1 bg-[#10b981] rounded-full inline-block" />
-          <span>Active Route</span>
+      {/* Bottom Coordinates & Legend Bar */}
+      <div className="absolute bottom-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        <div className="bg-slate-900/90 backdrop-blur-md p-2.5 rounded-xl border border-slate-700 shadow-md text-[11px] text-slate-300 flex flex-wrap items-center gap-3 font-mono pointer-events-auto">
+          <div className="flex items-center space-x-1.5">
+            <span className="w-3 h-1 bg-[#10b981] rounded-full inline-block" />
+            <span>Active Corridor</span>
+          </div>
+          <div className="flex items-center space-x-1.5">
+            <span className="w-3 h-1 bg-[#3b82f6] rounded-full inline-block" />
+            <span>Alt Corridor</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block text-white text-[9px] flex items-center justify-center font-bold">A</span>
+            <span>Origin</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-600 inline-block text-white text-[9px] flex items-center justify-center font-bold">B</span>
+            <span>Dest</span>
+          </div>
+          {cursorCoords && (
+            <div className="text-emerald-400 pl-2 border-l border-slate-700 font-mono">
+              📍 Cursor: {cursorCoords[0]}° N, {cursorCoords[1]}° E
+            </div>
+          )}
         </div>
-        <div className="flex items-center space-x-2">
-          <span className="w-3 h-1 bg-[#3b82f6] rounded-full inline-block" />
-          <span>Alt Corridor (Clickable)</span>
-        </div>
-        <div className="flex items-center space-x-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block text-white text-[9px] flex items-center justify-center font-bold">A</span>
-          <span>Origin</span>
-        </div>
-        <div className="flex items-center space-x-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-600 inline-block text-white text-[9px] flex items-center justify-center font-bold">B</span>
-          <span>Destination</span>
-        </div>
-        <div className="flex items-center space-x-1.5">
-          <span>⛔</span>
-          <span>Clearance Breach</span>
+
+        <div className="bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 shadow-md text-[11px] text-slate-300 font-mono pointer-events-auto">
+          💡 <em>Click anywhere on map to set Pin A/B or drag markers</em>
         </div>
       </div>
+
+      {/* API Key Modal */}
+      {keyModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-200 text-left space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Key className="w-5 h-5 text-emerald-700" />
+                <h3 className="text-base font-bold text-slate-900">Configure Google Maps API Key</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setKeyModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 text-sm font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-slate-600">
+              Enter your Google Maps JavaScript API key below to activate Google Maps Vector tiles, Live Traffic layers, Satellite view, and Google directions.
+            </p>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Google Maps API Key</label>
+              <input
+                type="text"
+                value={inputKey}
+                onChange={e => setInputKey(e.target.value)}
+                placeholder="AIzaSy..."
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
+              />
+            </div>
+            <div className="flex items-center justify-end space-x-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setKeyModalOpen(false)}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveKey}
+                className="px-4 py-1.5 rounded-xl text-xs font-bold bg-[#166534] hover:bg-[#14532d] text-white transition shadow-sm"
+              >
+                Save & Activate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

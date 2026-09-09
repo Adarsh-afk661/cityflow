@@ -82,6 +82,9 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
     selectedVehicle,
     startLocation,
     destinationLocation,
+    startCoords,
+    destCoords,
+    setPointFromMap,
     departureTime,
     fleet,
     cityZones
@@ -99,13 +102,18 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
   } | null>(null);
   const [navCardExpanded, setNavCardExpanded] = useState(true);
 
+  // Interactive coordinate states
+  const [cursorCoords, setCursorCoords] = useState<[number, number] | null>(null);
+  const [clickedCoords, setClickedCoords] = useState<[number, number] | null>(null);
+
   // Initialize Leaflet map instance once
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
     if (!mapInstanceRef.current) {
+      const defaultCenter: [number, number] = startCoords ? [startCoords[0], startCoords[1]] : [28.6250, 77.2950];
       const map = L.map(mapContainerRef.current, {
-        center: [28.6250, 77.2950],
+        center: defaultCenter,
         zoom: 12,
         zoomControl: false
       });
@@ -119,6 +127,16 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
 
       // Add zoom control in bottom right
       L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+      // Track cursor position in real-time
+      map.on('mousemove', (e: L.LeafletMouseEvent) => {
+        setCursorCoords([+e.latlng.lat.toFixed(4), +e.latlng.lng.toFixed(4)]);
+      });
+
+      // Handle map clicks to drop pin and select coordinates
+      map.on('click', (e: L.LeafletMouseEvent) => {
+        setClickedCoords([+e.latlng.lat.toFixed(5), +e.latlng.lng.toFixed(5)]);
+      });
 
       // Create separate layer groups for clean batch updates
       routesLayerGroupRef.current = L.layerGroup().addTo(map);
@@ -548,11 +566,15 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
     const primaryLatLngs = extractLatLngs(primaryRoute);
 
     if (primaryLatLngs.length > 1) {
-      const originPt = primaryLatLngs[0] as [number, number];
-      const destPt = primaryLatLngs[primaryLatLngs.length - 1] as [number, number];
+      const originPt: [number, number] = startCoords
+        ? [startCoords[0], startCoords[1]]
+        : (primaryLatLngs[0] as [number, number]);
+      const destPt: [number, number] = destCoords
+        ? [destCoords[0], destCoords[1]]
+        : (primaryLatLngs[primaryLatLngs.length - 1] as [number, number]);
       const pinTimes = calculateJourneyTimes(departureTime, primaryRoute.currentEtaMin);
 
-      // Origin Pin (A)
+      // Draggable Origin Pin (A)
       const originIcon = L.divIcon({
         className: 'origin-marker-icon',
         html: `
@@ -567,7 +589,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
         iconAnchor: [17, 17]
       });
 
-      L.marker(originPt, { icon: originIcon })
+      const originMarker = L.marker(originPt, { icon: originIcon, draggable: true })
         .bindPopup(`
           <div style="font-family: inherit; min-width: 220px; padding: 4px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid #bbf7d0; padding-bottom: 4px;">
@@ -582,12 +604,18 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
               <span style="font-size: 11px; color: #166534; font-weight: 600;">🕒 Pickup Time:</span>
               <span style="font-size: 12px; color: #166534; font-weight: 800;">${pinTimes.pickupTime}</span>
             </div>
-            <div style="font-size: 10px; color: #64748b;">Journey commences towards destination.</div>
+            <div style="font-size: 10px; color: #64748b; font-family: monospace;">GPS: ${originPt[0].toFixed(4)}, ${originPt[1].toFixed(4)}</div>
+            <div style="font-size: 10px; color: #047857; margin-top: 3px; font-weight: 600;">✨ Drag marker to reposition origin</div>
           </div>
         `)
         .addTo(markersGroup);
 
-      // Destination Pin (B)
+      originMarker.on('dragend', (e: any) => {
+        const p = e.target.getLatLng();
+        setPointFromMap('start', [+p.lat.toFixed(5), +p.lng.toFixed(5)]);
+      });
+
+      // Draggable Destination Pin (B)
       const destIcon = L.divIcon({
         className: 'dest-marker-icon',
         html: `
@@ -602,7 +630,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
         iconAnchor: [17, 17]
       });
 
-      L.marker(destPt, { icon: destIcon })
+      const destMarker = L.marker(destPt, { icon: destIcon, draggable: true })
         .bindPopup(`
           <div style="font-family: inherit; min-width: 220px; padding: 4px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid #fecaca; padding-bottom: 4px;">
@@ -617,10 +645,16 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
               <span style="font-size: 11px; color: #b91c1c; font-weight: 600;">🏁 Drop-off Time:</span>
               <span style="font-size: 12px; color: #b91c1c; font-weight: 800;">${pinTimes.dropoffTime}</span>
             </div>
-            <div style="font-size: 10px; color: #64748b;">Transit Duration: <strong>${primaryRoute.currentEtaMin} min</strong> (${primaryRoute.distanceKm} km)</div>
+            <div style="font-size: 10px; color: #64748b; font-family: monospace;">GPS: ${destPt[0].toFixed(4)}, ${destPt[1].toFixed(4)}</div>
+            <div style="font-size: 10px; color: #b91c1c; margin-top: 3px; font-weight: 600;">✨ Drag marker to reposition destination</div>
           </div>
         `)
         .addTo(markersGroup);
+
+      destMarker.on('dragend', (e: any) => {
+        const p = e.target.getLatLng();
+        setPointFromMap('dest', [+p.lat.toFixed(5), +p.lng.toFixed(5)]);
+      });
 
       // 4. ACCIDENT / COLLISION HAZARD MARKER (💥)
       // Placed on the Expressway corridor (Route A) where the severe bottleneck occurs
@@ -753,7 +787,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
         maxZoom: 14
       });
     }
-  }, [showJourneyRoutes, candidateRoutes, selectedRoute, selectedVehicle, startLocation, destinationLocation, departureTime, fleet, cityZones, setSelectedRoute]);
+  }, [showJourneyRoutes, candidateRoutes, selectedRoute, selectedVehicle, startLocation, destinationLocation, startCoords, destCoords, departureTime, fleet, cityZones, setSelectedRoute]);
 
   // Real-time geocoding search handler
   const handleSearch = async (e?: React.FormEvent) => {
@@ -796,6 +830,50 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
 
   return (
     <div className={`relative isolate z-0 w-full ${heightClass} bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 shadow-sm text-left select-none`}>
+      {/* Floating Clicked Coordinates Action Card */}
+      {clickedCoords && (
+        <div className="absolute top-16 left-3 z-30 bg-white/95 backdrop-blur-md p-3 rounded-2xl border border-emerald-600 shadow-2xl text-slate-900 space-y-2 animate-in fade-in zoom-in-95 duration-150">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center space-x-1.5 text-emerald-800 font-bold text-xs">
+              <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Map Coordinates Selected</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setClickedCoords(null)}
+              className="text-slate-400 hover:text-slate-800 text-xs font-bold cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="font-mono text-xs text-slate-800 bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
+            Lat: {clickedCoords[0]}°, Lon: {clickedCoords[1]}°
+          </div>
+          <div className="flex items-center space-x-2 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setPointFromMap('start', clickedCoords);
+                setClickedCoords(null);
+              }}
+              className="px-2.5 py-1 bg-[#166534] hover:bg-[#14532d] text-white rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
+            >
+              <span>Set as Origin (A)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPointFromMap('dest', clickedCoords);
+                setClickedCoords(null);
+              }}
+              className="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
+            >
+              <span>Set as Dest (B)</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Search Header Bar (Real-Time OSM Geocoding) */}
       <div className="absolute top-3 left-3 right-3 sm:right-auto sm:w-96 z-10">
         <form onSubmit={handleSearch} className="relative flex items-center shadow-md rounded-xl">
@@ -957,6 +1035,11 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
               <span className="text-sm leading-none">🚧</span>
               <span>Underpass (3.8m)</span>
             </div>
+            {cursorCoords && (
+              <div className="text-emerald-800 pl-2 border-l border-slate-300 font-mono text-[10.5px] font-bold">
+                📍 Cursor: {cursorCoords[0]}° N, {cursorCoords[1]}° E
+              </div>
+            )}
           </>
         ) : (
           <>
@@ -976,8 +1059,18 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
               <span className="text-sm leading-none">💥</span>
               <span>Regional Bottleneck</span>
             </div>
+            {cursorCoords && (
+              <div className="text-emerald-800 pl-2 border-l border-slate-300 font-mono text-[10.5px] font-bold">
+                📍 Cursor: {cursorCoords[0]}° N, {cursorCoords[1]}° E
+              </div>
+            )}
           </>
         )}
+      </div>
+
+      {/* Drag & Click Instruction Floating Helper */}
+      <div className="absolute bottom-3 right-3 z-10 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 shadow-md text-[10.5px] text-slate-600 font-mono pointer-events-auto hidden md:block">
+        💡 <em>Click map to drop Pin A/B or drag markers</em>
       </div>
     </div>
   );

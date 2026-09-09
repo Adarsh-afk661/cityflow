@@ -20,6 +20,8 @@ import { calculateSafetyScore } from '../services/safetyEngine';
 import { calculateEmissions } from '../services/emissionEngine';
 import { rankCandidateRoutes } from '../services/rankingEngine';
 import { getCorridorCoordinates } from '../data/corridorRoutes';
+import { calculateDynamicRoutes, RouteEndpoints } from '../services/dynamicRouting';
+import { searchDelhiPlaces, findClosestPlace, DELHI_NCR_PLACES } from '../services/delhiPlaces';
 
 export type PageName = 'landing' | 'dashboard' | 'routeshield' | 'fleet' | 'whatif' | 'analytics' | 'alerts' | 'settings';
 
@@ -61,13 +63,25 @@ interface CityFlowContextType {
   departureTime: string;
   setDepartureTime: (time: string) => void;
 
+  // Real Dynamic Coordinates
+  startCoords: [number, number] | null;
+  setStartCoords: (coords: [number, number] | null) => void;
+  destCoords: [number, number] | null;
+  setDestCoords: (coords: [number, number] | null) => void;
+  setRouteEndpoints: (startName: string, startCoords: [number, number], destName: string, destCoords: [number, number]) => void;
+  setPointFromMap: (type: 'start' | 'dest', coords: [number, number], name?: string) => void;
+
+  // Google Maps API
+  googleApiKey: string;
+  setGoogleApiKey: (key: string) => void;
+
   // Analysis & Routes
   candidateRoutes: CandidateRoute[];
   selectedRoute: CandidateRoute | null;
   setSelectedRoute: (route: CandidateRoute | null) => void;
   isAnalyzing: boolean;
   analysisStage: number;
-  runRouteAnalysis: (startOverride?: string, destOverride?: string) => Promise<void>;
+  runRouteAnalysis: (startOverride?: string, destOverride?: string, sCoords?: [number, number], dCoords?: [number, number]) => Promise<void>;
 
   // Live Traffic & System
   liveTrafficEnabled: boolean;
@@ -130,11 +144,30 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [vehicles, setVehicles] = useState<Vehicle[]>(DEFAULT_VEHICLES);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle>(DEFAULT_VEHICLES[0]); // Heavy Delivery Truck
 
-  // Planning Form
-  const [startLocation, setStartLocation] = useState<string>('Delhi');
-  const [destinationLocation, setDestinationLocation] = useState<string>('Greater Noida');
+  // Planning Form & Specific Coordinates (Default: CP to Pari Chowk Greater Noida)
+  const [startLocation, setStartLocation] = useState<string>('Connaught Place (Rajiv Chowk)');
+  const [destinationLocation, setDestinationLocation] = useState<string>('Pari Chowk, Greater Noida');
+  const [startCoords, setStartCoords] = useState<[number, number] | null>([28.6328, 77.2197]);
+  const [destCoords, setDestCoords] = useState<[number, number] | null>([28.4744, 77.5040]);
   const [routingMode, setRoutingMode] = useState<RoutingMode>('balanced');
   const [departureTime, setDepartureTime] = useState<string>('Now (10:15 AM)');
+
+  // Google Maps API Key
+  const [googleApiKey, setGoogleApiKeyState] = useState<string>(() => {
+    return (
+      (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) ||
+      (typeof window !== 'undefined' ? localStorage.getItem('CITYFLOW_GOOGLE_MAPS_KEY') || '' : '')
+    );
+  });
+
+  const setGoogleApiKey = (key: string) => {
+    setGoogleApiKeyState(key);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('CITYFLOW_GOOGLE_MAPS_KEY', key);
+      }
+    } catch (e) {}
+  };
 
   // Routes
   const [candidateRoutes, setCandidateRoutes] = useState<CandidateRoute[]>(INITIAL_BASE_ROUTES);
@@ -201,133 +234,84 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [demoStep, setDemoStep] = useState<number>(0);
   const [demoFinalModalOpen, setDemoFinalModalOpen] = useState<boolean>(false);
 
-  const getCorridorMetrics = (start: string, dest: string) => {
-    const s = (start || '').toLowerCase();
-    const d = (dest || '').toLowerCase();
-
-    if (s.includes('greater noida') || d.includes('greater noida')) {
-      return {
-        'route-a': { dist: 51.8, dur: 64, name: 'NOIDA-GR NOIDA EXPWY & DND', summary: 'Direct corridor via Noida-Gr Noida Expy & Outer Ring' },
-        'route-b': { dist: 58.4, dur: 59, name: 'EASTERN PERIPHERAL BYPASS', summary: 'Commercial bypass via EPE with 5.0m clearance' },
-        'route-c': { dist: 54.2, dur: 68, name: 'YAMUNA EXPWY CONNECTOR', summary: 'High-speed corridor with steady gradient flow' }
-      };
+  // Helper to resolve coordinates for any location name in Delhi or worldwide
+  const resolveCoordinates = async (query: string, fallback: [number, number]): Promise<[number, number]> => {
+    if (!query || !query.trim()) return fallback;
+    const places = searchDelhiPlaces(query, 1);
+    if (places.length > 0 && places[0].lat && places[0].lon) {
+      return [places[0].lat, places[0].lon];
     }
-    if (s.includes('cyber city') || s.includes('gurugram') || d.includes('cyber city') || d.includes('gurugram')) {
-      return {
-        'route-a': { dist: 27.6, dur: 42, name: 'DELHI-GURGAON EXPWY (NH48)', summary: 'Direct NH48 arterial into Central Delhi' },
-        'route-b': { dist: 31.2, dur: 48, name: 'MG ROAD & SOUTH RING BYPASS', summary: 'High-clearance boulevard avoiding arterial bottlenecks' },
-        'route-c': { dist: 29.5, dur: 45, name: 'MEHRAULI ARTERIAL VIADUCT', summary: 'Steady elevated corridor through South Delhi' }
-      };
-    }
-    if ((s.includes('noida') && (d.includes('airport') || d.includes('delhi airport'))) || ((s.includes('airport') || s.includes('delhi airport')) && d.includes('noida'))) {
-      return {
-        'route-a': { dist: 36.8, dur: 48, name: 'NH9 & BARAPULLAH ELEVATED', summary: 'Elevated highway link directly to Airport Approach' },
-        'route-b': { dist: 39.4, dur: 52, name: 'DND FLYWAY & OUTER RING ROAD', summary: 'Commercial corridor bypassing urban core intersections' },
-        'route-c': { dist: 41.2, dur: 56, name: 'KALINDI KUNJ GREEN LINK', summary: 'Southern perimeter route with full height clearance' }
-      };
-    }
-    if (
-      (s.includes('delhi') && (d.includes('greater noida') || d.includes('noida'))) ||
-      ((s.includes('greater noida') || s.includes('noida')) && d.includes('delhi'))
-    ) {
-      return {
-        'route-a': { dist: 42.17, dur: 42, name: 'NOIDA-GREATER NOIDA EXPRESSWAY', summary: 'Direct multi-lane expressway via Sector 126 & Pari Chowk' },
-        'route-b': { dist: 48.07, dur: 45, name: 'REGIONAL RING & VIADUCT BYPASS', summary: 'High-clearance circumferential viaduct (5.2m overhead clearance)' },
-        'route-c': { dist: 45.8, dur: 49, name: 'DADRI ARTERIAL & SURAJPUR CORRIDOR', summary: 'Commercial freight corridor avoiding peak city bottlenecks' }
-      };
-    }
-    // Default: Delhi -> Greater Noida
-    return {
-      'route-a': { dist: 42.17, dur: 42, name: 'NOIDA-GREATER NOIDA EXPRESSWAY', summary: 'Direct multi-lane expressway via Sector 126 & Pari Chowk' },
-      'route-b': { dist: 48.07, dur: 45, name: 'REGIONAL RING & VIADUCT BYPASS', summary: 'High-clearance circumferential viaduct (5.2m overhead clearance)' },
-      'route-c': { dist: 45.8, dur: 49, name: 'DADRI ARTERIAL & SURAJPUR CORRIDOR', summary: 'Commercial freight corridor avoiding peak city bottlenecks' }
-    };
+    try {
+      const res = await fetch(`/api/map/geocode?q=${encodeURIComponent(query)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lon = parseFloat(data[0].lon);
+          if (!isNaN(lat) && !isNaN(lon)) return [lat, lon];
+        }
+      }
+    } catch (e) {}
+    return fallback;
   };
 
-  // Helper function to evaluate routes for a given vehicle, mode, and corridor
-  const evaluateRoutes = (
-    veh: Vehicle,
-    mode: RoutingMode,
-    startLoc: string = startLocation,
-    destLoc: string = destinationLocation
-  ): CandidateRoute[] => {
-    const metrics = getCorridorMetrics(startLoc, destLoc);
-    const coords = getCorridorCoordinates(startLoc, destLoc);
-
-    const rawRoutes = INITIAL_BASE_ROUTES.map(baseRoute => {
-      const m = metrics[baseRoute.id as keyof typeof metrics] || {
-        dist: baseRoute.distanceKm,
-        dur: baseRoute.baseDurationMin,
-        name: baseRoute.corridorName,
-        summary: baseRoute.description
-      };
-      const effectiveDist = m.dist;
-      const effectiveBaseDur = m.dur;
-      const routeCoords = coords[baseRoute.id as keyof typeof coords] || baseRoute.realCoordinates;
-
-      // 1. Physical Clearance Validation
-      const clearanceEval = evaluateRouteClearance(veh, baseRoute.infrastructureEncountered);
-
-      // 2. Predictive Reliability
-      const reliability = predictJourneyReliability({
-        baseDurationMin: effectiveBaseDur,
-        trafficLevel: baseRoute.trafficLevel,
-        vehicle: veh,
-        incidentCount: baseRoute.id === 'route-a' ? 1 : 0
-      });
-
-      // 3. Safety Scoring
-      const safety = calculateSafetyScore({
-        baseSafetyScore: baseRoute.safetyScore,
-        trafficLevel: baseRoute.trafficLevel,
-        hasClearanceIssue: clearanceEval.status === 'failed',
-        activeIncidentsOnRoute: baseRoute.id === 'route-a' ? 1 : 0,
-        roadType: baseRoute.id === 'route-a' ? 'expressway' : baseRoute.id === 'route-b' ? 'beltway' : 'parkway'
-      });
-
-      // 4. Emissions
-      const emissions = calculateEmissions({
-        distanceKm: effectiveDist,
-        vehicle: veh,
-        trafficLevel: baseRoute.trafficLevel
-      });
-
-      return {
-        ...baseRoute,
-        distanceKm: effectiveDist,
-        baseDurationMin: effectiveBaseDur,
-        currentEtaMin: reliability.predictedEtaMin,
-        predictedTimeRange: reliability.predictedTimeRange,
-        reliabilityScore: reliability.reliabilityScore,
-        delayRiskPercent: reliability.delayRiskPercent,
-        safetyScore: safety.overallScore,
-        safetyBreakdown: safety.breakdown,
-        estimatedCo2Kg: emissions.estimatedCo2Kg,
-        fuelImpactLiters: emissions.fuelImpactLiters,
-        clearanceStatus: clearanceEval.status,
-        clearanceChecks: clearanceEval.checks,
-        realCoordinates: routeCoords
-      };
-    });
-
-    return rankCandidateRoutes(rawRoutes, mode);
+  // Set endpoints atomically and analyze
+  const setRouteEndpoints = (
+    startName: string,
+    sCoords: [number, number],
+    destName: string,
+    dCoords: [number, number]
+  ) => {
+    setStartLocation(startName);
+    setStartCoords(sCoords);
+    setDestinationLocation(destName);
+    setDestCoords(dCoords);
+    runRouteAnalysis(startName, destName, sCoords, dCoords);
   };
 
-  // Run initial evaluation on mount & fetch live backend GIS journey
+  // Set origin or destination from clicking on the map
+  const setPointFromMap = (type: 'start' | 'dest', coords: [number, number], name?: string) => {
+    const closest = findClosestPlace(coords[0], coords[1]);
+    const computedName = name || (closest ? `${closest.name}` : `Pin (${coords[0].toFixed(4)}, ${coords[1].toFixed(4)})`);
+    if (type === 'start') {
+      setStartLocation(computedName);
+      setStartCoords(coords);
+      runRouteAnalysis(computedName, destinationLocation, coords, destCoords || [28.4744, 77.5040]);
+    } else {
+      setDestinationLocation(computedName);
+      setDestCoords(coords);
+      runRouteAnalysis(startLocation, computedName, startCoords || [28.6328, 77.2197], coords);
+    }
+  };
+
+  // Run initial evaluation on mount & fetch live dynamic road journey
   useEffect(() => {
-    const evaluated = evaluateRoutes(selectedVehicle, routingMode, 'Delhi', 'Greater Noida');
-    setCandidateRoutes(evaluated);
-    const recommended = evaluated.find(r => r.isRecommended) || evaluated[1] || evaluated[0];
-    setSelectedRoute(recommended);
-
-    // Asynchronously call real live OSRM/Weather/Clearance backend
-    runRouteAnalysis('Delhi', 'Greater Noida');
+    runRouteAnalysis('Connaught Place (Rajiv Chowk)', 'Pari Chowk, Greater Noida', [28.6328, 77.2197], [28.4744, 77.5040]);
   }, []);
+
+  // Recalculate routes dynamically when vehicle or routing mode changes
+  useEffect(() => {
+    if (startCoords && destCoords) {
+      calculateDynamicRoutes(
+        {
+          startName: startLocation,
+          startCoords,
+          destName: destinationLocation,
+          destCoords
+        },
+        selectedVehicle,
+        routingMode
+      ).then(routes => {
+        setCandidateRoutes(routes);
+        const top = routes.find(r => r.isRecommended) || routes.find(r => r.clearanceStatus === 'approved') || routes[0];
+        setSelectedRoute(top);
+      });
+    }
+  }, [routingMode, selectedVehicle]);
 
   // ─────────────────────────────────────────────────────────────
   // ZONE PRESSURE REFRESH (backend only — no Math.random)
   // Fetches real zone status from /api/traffic every 30s.
-  // Fleet telemetry is NOT simulated — GPS NOT CONNECTED.
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!liveTrafficEnabled) return;
@@ -343,7 +327,7 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
           }
         }
       } catch {
-        // Traffic data unavailable — keep existing zone state, do not fake
+        // Traffic data unavailable
       }
     };
 
@@ -352,8 +336,13 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
     return () => clearInterval(interval);
   }, [liveTrafficEnabled]);
 
-  // Route Analysis animated workflow (7 stages)
-  const runRouteAnalysis = async (startOverride?: string, destOverride?: string): Promise<void> => {
+  // Route Analysis animated workflow
+  const runRouteAnalysis = async (
+    startOverride?: string,
+    destOverride?: string,
+    sCoordsOverride?: [number, number],
+    dCoordsOverride?: [number, number]
+  ): Promise<void> => {
     const startTarget = startOverride || startLocation;
     const destTarget = destOverride || destinationLocation;
 
@@ -363,10 +352,17 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
     setIsAnalyzing(true);
     setAnalysisStage(0);
 
-    // 7-stage animated pipeline
-    for (let step = 0; step < 7; step++) {
+    // Resolve exact GPS coordinates
+    const effectiveSCoords = sCoordsOverride || startCoords || await resolveCoordinates(startTarget, [28.6328, 77.2197]);
+    const effectiveDCoords = dCoordsOverride || destCoords || await resolveCoordinates(destTarget, [28.4744, 77.5040]);
+
+    setStartCoords(effectiveSCoords);
+    setDestCoords(effectiveDCoords);
+
+    // 5-stage animated analysis pipeline
+    for (let step = 0; step < 5; step++) {
       setAnalysisStage(step);
-      await new Promise(resolve => setTimeout(resolve, 180));
+      await new Promise(resolve => setTimeout(resolve, 140));
     }
 
     try {
@@ -376,6 +372,8 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
         body: JSON.stringify({
           start: startTarget,
           destination: destTarget,
+          startCoords: effectiveSCoords,
+          destCoords: effectiveDCoords,
           vehicle: selectedVehicle,
           routingMode
         })
@@ -395,16 +393,29 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
       }
     } catch (err) {
-      console.warn('[CityFlow] Live API journey query fallback:', err);
+      console.warn('[CityFlow] Live backend API fallback, running dynamic road routing engine:', err);
     }
 
-    // Offline / Network Degradation Fallback
-    const calculated = evaluateRoutes(selectedVehicle, routingMode, startTarget, destTarget);
-    setCandidateRoutes(calculated);
-    const topFeasible = calculated.find(r => r.isRecommended) || calculated.find(r => r.clearanceStatus === 'approved') || calculated[0];
-    setSelectedRoute(topFeasible);
-
-    setIsAnalyzing(false);
+    // Dynamic Geodesic / OSRM routing directly in client
+    try {
+      const dynamicRoutes = await calculateDynamicRoutes(
+        {
+          startName: startTarget,
+          startCoords: effectiveSCoords,
+          destName: destTarget,
+          destCoords: effectiveDCoords
+        },
+        selectedVehicle,
+        routingMode
+      );
+      setCandidateRoutes(dynamicRoutes);
+      const topFeasible = dynamicRoutes.find(r => r.isRecommended) || dynamicRoutes.find(r => r.clearanceStatus === 'approved') || dynamicRoutes[0];
+      setSelectedRoute(topFeasible);
+    } catch (e) {
+      console.error('Dynamic routing engine error:', e);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const toggleLiveTraffic = () => {
@@ -532,30 +543,7 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
     } catch (e) {}
   };
 
-  // Re-evaluate routes dynamically when routing mode, destination, or vehicle changes
-  useEffect(() => {
-    const updated = evaluateRoutes(selectedVehicle, routingMode, startLocation, destinationLocation);
-    setCandidateRoutes(updated);
 
-    // Select the best matching route for the active preference
-    let targetRoute: CandidateRoute | undefined;
-    if (routingMode === 'fastest') {
-      targetRoute = [...updated].sort((a, b) => a.currentEtaMin - b.currentEtaMin).find(r => r.clearanceStatus === 'approved') || updated[0];
-    } else if (routingMode === 'eco') {
-      targetRoute = [...updated].sort((a, b) => a.estimatedCo2Kg - b.estimatedCo2Kg).find(r => r.clearanceStatus === 'approved') || updated[2] || updated[0];
-    } else if (routingMode === 'reliable') {
-      targetRoute = [...updated].sort((a, b) => b.reliabilityScore - a.reliabilityScore).find(r => r.clearanceStatus === 'approved') || updated[1] || updated[0];
-    } else if (routingMode === 'clearance') {
-      targetRoute = updated.find(r => r.clearanceStatus === 'approved') || updated[1] || updated[0];
-    } else {
-      // Balanced
-      targetRoute = updated.find(r => r.isRecommended) || updated.find(r => r.clearanceStatus === 'approved') || updated[0];
-    }
-
-    if (targetRoute) {
-      setSelectedRoute(targetRoute);
-    }
-  }, [routingMode, selectedVehicle, startLocation, destinationLocation]);
 
   // Demo Workflow: Executes the 38-step demo story seamlessly
   const startGuidedDemo = async () => {
@@ -600,15 +588,15 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
   const resetAllData = () => {
     setVehicles(DEFAULT_VEHICLES);
     setSelectedVehicle(DEFAULT_VEHICLES[0]);
-    setStartLocation('Central Warehouse');
-    setDestinationLocation('North Distribution Hub');
+    setStartLocation('Connaught Place (Rajiv Chowk)');
+    setDestinationLocation('Pari Chowk, Greater Noida');
+    setStartCoords([28.6328, 77.2197]);
+    setDestCoords([28.4744, 77.5040]);
     setRoutingMode('balanced');
     setFleet(INITIAL_FLEET);
     setAlerts(INITIAL_ALERTS);
     setCityZones(CITY_ZONES);
-    const fresh = evaluateRoutes(DEFAULT_VEHICLES[0], 'balanced');
-    setCandidateRoutes(fresh);
-    setSelectedRoute(fresh.find(r => r.isRecommended) || fresh[1]);
+    runRouteAnalysis('Connaught Place (Rajiv Chowk)', 'Pari Chowk, Greater Noida', [28.6328, 77.2197], [28.4744, 77.5040]);
     setActivePage('dashboard');
     setIsDemoRunning(false);
     setDemoFinalModalOpen(false);
@@ -641,6 +629,14 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
         setStartLocation,
         destinationLocation,
         setDestinationLocation,
+        startCoords,
+        setStartCoords,
+        destCoords,
+        setDestCoords,
+        setRouteEndpoints,
+        setPointFromMap,
+        googleApiKey,
+        setGoogleApiKey,
         routingMode,
         setRoutingMode,
         departureTime,

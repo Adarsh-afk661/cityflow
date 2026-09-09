@@ -101,7 +101,7 @@ const CityFlowContext = createContext<CityFlowContextType | undefined>(undefined
 
 export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [activePage, setActivePage] = useState<PageName>('landing');
-  const [selectedCity, setSelectedCity] = useState<string>('Metroflow Metropolitan');
+  const [selectedCity, setSelectedCity] = useState<string>('Delhi — Greater Noida Corridor');
 
   // Authentication State
   const [user, setUser] = useState<User | null>(() => {

@@ -29,17 +29,39 @@ export const TopNav: React.FC = () => {
     user,
     setLoginModalOpen,
     setDataFeedModalOpen,
-    logout
+    logout,
+    setStartLocation,
+    setDestinationLocation,
+    runRouteAnalysis
   } = useCityFlow();
 
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const cities = [
-    'Metroflow Metropolitan',
-    'Aethelgard Port Conurbation',
-    'Bay Intermodal Logistics Corridor'
+    'Delhi — Greater Noida Corridor',
+    'Delhi (National Capital Territory)',
+    'Greater Noida (Industrial & Logistics Hub)'
   ];
+
+  const handleCitySelect = (city: string) => {
+    setSelectedCity(city);
+    setCityDropdownOpen(false);
+
+    if (city.includes('Greater Noida Corridor')) {
+      setStartLocation('Delhi');
+      setDestinationLocation('Greater Noida');
+      runRouteAnalysis('Delhi', 'Greater Noida');
+    } else if (city.includes('Delhi (National Capital')) {
+      setStartLocation('Delhi');
+      setDestinationLocation('Connaught Place, New Delhi');
+      runRouteAnalysis('Delhi', 'Connaught Place, New Delhi');
+    } else if (city.includes('Greater Noida')) {
+      setStartLocation('Delhi');
+      setDestinationLocation('Greater Noida');
+      runRouteAnalysis('Delhi', 'Greater Noida');
+    }
+  };
 
   const unreadAlerts = alerts.filter(a => !a.acknowledged);
   const activeFleetCount = fleet.filter(f => f.status === 'active').length;
@@ -59,15 +81,12 @@ export const TopNav: React.FC = () => {
           </button>
 
           {cityDropdownOpen && (
-            <div className="absolute left-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-xl py-1.5 z-50">
+            <div className="absolute left-0 mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-xl py-1.5 z-50">
               {cities.map(c => (
                 <button
                   key={c}
-                  onClick={() => {
-                    setSelectedCity(c);
-                    setCityDropdownOpen(false);
-                  }}
-                  className={`w-full text-left px-4 py-2 text-xs font-medium hover:bg-slate-50 transition ${
+                  onClick={() => handleCitySelect(c)}
+                  className={`w-full text-left px-4 py-2.5 text-xs font-medium hover:bg-slate-50 transition ${
                     selectedCity === c ? 'text-emerald-800 font-bold bg-emerald-50' : 'text-slate-700'
                   }`}
                 >

@@ -7,7 +7,9 @@ import {
   ArrowRight,
   Sliders,
   Columns,
-  MapPin
+  MapPin,
+  Clock,
+  Navigation
 } from 'lucide-react';
 import { RoutePlanner } from '../components/routeshield/RoutePlanner';
 import { RouteCard } from '../components/routeshield/RouteCard';
@@ -15,6 +17,40 @@ import { AnalysisModal } from '../components/routeshield/AnalysisModal';
 import { RouteCompare } from '../components/routeshield/RouteCompare';
 import { CityMap } from '../components/map/CityMap';
 import { useCityFlow } from '../context/CityFlowContext';
+
+// Helper to compute realistic Pickup and Drop-off times
+const calculateJourneyTimes = (departureStr: string = 'Now', durationMins: number = 30) => {
+  const match = departureStr ? departureStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i) : null;
+  let startHour: number;
+  let startMin: number;
+
+  if (match) {
+    let h = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10);
+    const period = match[3].toUpperCase();
+    if (period === 'PM' && h < 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
+    startHour = h;
+    startMin = m;
+  } else {
+    const now = new Date();
+    startHour = now.getHours();
+    startMin = now.getMinutes();
+  }
+
+  const pickupDate = new Date();
+  pickupDate.setHours(startHour, startMin, 0, 0);
+
+  const dropoffDate = new Date(pickupDate.getTime() + durationMins * 60 * 1000);
+
+  const fmt = (d: Date) =>
+    d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+
+  return {
+    pickupTime: fmt(pickupDate),
+    dropoffTime: fmt(dropoffDate),
+  };
+};
 
 export const RouteShieldPage: React.FC = () => {
   const {
@@ -24,6 +60,7 @@ export const RouteShieldPage: React.FC = () => {
     selectedVehicle,
     startLocation,
     destinationLocation,
+    departureTime,
     setActivePage
   } = useCityFlow();
 
@@ -215,7 +252,84 @@ export const RouteShieldPage: React.FC = () => {
               </span>
             )}
           </div>
-          <CityMap heightClass="h-[460px]" showControls={false} showJourneyRoutes={true} />
+
+          {/* Google Maps Style Journey Navigation & Timing HUD */}
+          {(() => {
+            const activeRoute = selectedRoute || (candidateRoutes && candidateRoutes[0]);
+            if (!activeRoute) return null;
+            const times = calculateJourneyTimes(departureTime, activeRoute.currentEtaMin);
+            return (
+              <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-md text-xs space-y-2.5 animate-in fade-in duration-200">
+                {/* Header: ETA Duration & Status */}
+                <div className="flex items-center justify-between bg-gradient-to-r from-[#166534] to-[#15803d] text-white p-2.5 rounded-xl shadow-xs">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
+                      <Navigation className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <div>
+                      <div className="flex items-baseline space-x-1.5">
+                        <span className="text-base font-black leading-none">{activeRoute.currentEtaMin} min</span>
+                        <span className="text-[11px] font-medium text-emerald-100">({activeRoute.distanceKm} km)</span>
+                      </div>
+                      <div className="text-[10px] text-emerald-200 font-medium">Fastest route · Typical traffic</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-mono font-bold bg-white/20 px-2 py-0.5 rounded text-white">
+                      {activeRoute.clearanceStatus === 'approved' ? 'SAFE CORRIDOR' : 'BARRED'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* From ➔ To & Pick/Drop Timings */}
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  {/* Origin / Pickup */}
+                  <div className="bg-slate-50 border border-slate-200 p-2 rounded-xl flex flex-col justify-between">
+                    <div className="flex items-center space-x-1 text-[#166534] font-bold text-[10px] uppercase">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#166534]"></span>
+                      <span>Pickup (Start)</span>
+                    </div>
+                    <div className="font-bold text-slate-800 truncate mt-0.5" title={startLocation}>
+                      {startLocation || 'Delhi Hub'}
+                    </div>
+                    <div className="mt-1 font-mono font-bold text-[#166534] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 text-[10.5px] flex items-center space-x-1">
+                      <Clock className="w-3 h-3 text-[#166534]" />
+                      <span>{times.pickupTime}</span>
+                    </div>
+                  </div>
+
+                  {/* Destination / Drop-off */}
+                  <div className="bg-slate-50 border border-slate-200 p-2 rounded-xl flex flex-col justify-between">
+                    <div className="flex items-center space-x-1 text-[#b91c1c] font-bold text-[10px] uppercase">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#b91c1c]"></span>
+                      <span>Drop-off (End)</span>
+                    </div>
+                    <div className="font-bold text-slate-800 truncate mt-0.5" title={destinationLocation}>
+                      {destinationLocation || 'Greater Noida Hub'}
+                    </div>
+                    <div className="mt-1 font-mono font-bold text-[#b91c1c] bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 text-[10.5px] flex items-center space-x-1">
+                      <Clock className="w-3 h-3 text-[#b91c1c]" />
+                      <span>{times.dropoffTime}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sub-bar: Direction Guidance notice */}
+                <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-100">
+                  <span className="font-medium text-slate-700 flex items-center space-x-1">
+                    <span>Corridor:</span>
+                    <strong className="text-slate-900 truncate max-w-[150px]">{activeRoute.name}</strong>
+                  </span>
+                  <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 flex items-center space-x-1">
+                    <ArrowRight className="w-2.5 h-2.5" />
+                    <span>Direction Arrows Active</span>
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
+          <CityMap heightClass="h-[430px]" showControls={true} showJourneyRoutes={true} />
 
           {/* Selected Route Quick Telemetry bar */}
           {selectedRoute && (

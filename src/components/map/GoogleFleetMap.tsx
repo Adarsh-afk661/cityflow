@@ -10,6 +10,11 @@ import {
   Truck,
   RotateCcw,
   Navigation,
+  Navigation2,
+  Clock,
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
   Sparkles,
   Info
 } from 'lucide-react';
@@ -17,6 +22,40 @@ import { useCityFlow } from '../../context/CityFlowContext';
 import { RealTimeOSMMap } from './RealTimeOSMMap';
 
 declare const google: any;
+
+// Helper to compute realistic Pickup and Drop-off times
+const calculateJourneyTimes = (departureStr: string = 'Now', durationMins: number = 30) => {
+  const match = departureStr ? departureStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i) : null;
+  let startHour: number;
+  let startMin: number;
+
+  if (match) {
+    let h = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10);
+    const period = match[3].toUpperCase();
+    if (period === 'PM' && h < 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
+    startHour = h;
+    startMin = m;
+  } else {
+    const now = new Date();
+    startHour = now.getHours();
+    startMin = now.getMinutes();
+  }
+
+  const pickupDate = new Date();
+  pickupDate.setHours(startHour, startMin, 0, 0);
+
+  const dropoffDate = new Date(pickupDate.getTime() + durationMins * 60 * 1000);
+
+  const fmt = (d: Date) =>
+    d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+
+  return {
+    pickupTime: fmt(pickupDate),
+    dropoffTime: fmt(dropoffDate),
+  };
+};
 
 interface GoogleFleetMapProps {
   heightClass?: string;
@@ -105,11 +144,13 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
     setSelectedRoute,
     selectedVehicle,
     startLocation,
-    destinationLocation
+    destinationLocation,
+    departureTime
   } = useCityFlow();
 
   const [mapError, setMapError] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [navCardExpanded, setNavCardExpanded] = useState(true);
 
   const googleApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || (typeof window !== 'undefined' ? localStorage.getItem('CITYFLOW_GOOGLE_MAPS_KEY') || '' : '');
 
@@ -229,6 +270,18 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
         strokeOpacity,
         strokeWeight,
         zIndex,
+        icons: [{
+          icon: {
+            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+            scale: isSelected ? 3.5 : 2.5,
+            strokeColor: '#ffffff',
+            strokeWeight: 1.5,
+            fillColor: strokeColor,
+            fillOpacity: 1
+          },
+          offset: '25px',
+          repeat: '80px'
+        }],
         map
       });
 
@@ -245,11 +298,12 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
     if (waypoints.length > 1) {
       const originPt = { lat: waypoints[0][1], lng: waypoints[0][0] };
       const destPt = { lat: waypoints[waypoints.length - 1][1], lng: waypoints[waypoints.length - 1][0] };
+      const journeyTimes = calculateJourneyTimes(departureTime, primaryRoute.currentEtaMin);
 
       const originMarker = new google.maps.Marker({
         position: originPt,
         map,
-        title: `Origin: ${startLocation}`,
+        title: `Pickup Point: ${startLocation}`,
         label: { text: 'A', color: '#ffffff', fontWeight: 'bold' },
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
@@ -260,12 +314,29 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
           strokeWeight: 2
         }
       });
+
+      const originInfo = new google.maps.InfoWindow({
+        content: `
+          <div style="font-family: sans-serif; min-width: 220px; padding: 4px; color: #0f172a;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid #bbf7d0; padding-bottom: 4px;">
+              <strong style="color: #166534; font-size: 12px;">PICKUP LOCATION (START)</strong>
+              <span style="font-size: 10px; font-weight: bold; background: #dcfce7; color: #166534; padding: 1px 6px; border-radius: 4px;">STOP A</span>
+            </div>
+            <div style="font-size: 13px; font-weight: bold; margin-bottom: 5px;">${startLocation || 'Delhi Hub'}</div>
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 5px 8px; margin-bottom: 4px;">
+              <span style="font-size: 11px; color: #166534;">🕒 <b>Pickup Time:</b> ${journeyTimes.pickupTime}</span>
+            </div>
+            <div style="font-size: 10px; color: #64748b;">Journey commences towards ${destinationLocation || 'destination'}</div>
+          </div>
+        `
+      });
+      originMarker.addListener('click', () => originInfo.open(map, originMarker));
       markersRef.current.push(originMarker);
 
       const destMarker = new google.maps.Marker({
         position: destPt,
         map,
-        title: `Destination: ${destinationLocation}`,
+        title: `Drop-off Point: ${destinationLocation}`,
         label: { text: 'B', color: '#ffffff', fontWeight: 'bold' },
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
@@ -276,6 +347,23 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
           strokeWeight: 2
         }
       });
+
+      const destInfo = new google.maps.InfoWindow({
+        content: `
+          <div style="font-family: sans-serif; min-width: 220px; padding: 4px; color: #0f172a;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid #fecaca; padding-bottom: 4px;">
+              <strong style="color: #b91c1c; font-size: 12px;">DROP-OFF LOCATION (DEST)</strong>
+              <span style="font-size: 10px; font-weight: bold; background: #fee2e2; color: #b91c1c; padding: 1px 6px; border-radius: 4px;">STOP B</span>
+            </div>
+            <div style="font-size: 13px; font-weight: bold; margin-bottom: 5px;">${destinationLocation || 'Greater Noida Hub'}</div>
+            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 5px 8px; margin-bottom: 4px;">
+              <span style="font-size: 11px; color: #b91c1c;">🏁 <b>Expected Drop Time:</b> ${journeyTimes.dropoffTime}</span>
+            </div>
+            <div style="font-size: 10px; color: #64748b;">Estimated Transit: <b>${primaryRoute.currentEtaMin} min</b> (${primaryRoute.distanceKm} km)</div>
+          </div>
+        `
+      });
+      destMarker.addListener('click', () => destInfo.open(map, destMarker));
       markersRef.current.push(destMarker);
 
       // 3. Render physical clearance checkpoint violation marker ONLY if vehicle physically breaches infrastructure
@@ -326,7 +414,7 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
     if (!bounds.isEmpty()) {
       map.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
     }
-  }, [isLoaded, candidateRoutes, selectedRoute, selectedVehicle, startLocation, destinationLocation]);
+  }, [isLoaded, candidateRoutes, selectedRoute, selectedVehicle, startLocation, destinationLocation, departureTime]);
 
   // If Google Maps API key is not configured or fails to load, gracefully fall back to live OpenStreetMap
   if (mapError || !googleApiKey) {
@@ -337,6 +425,9 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
     );
   }
 
+  const primaryRoute = selectedRoute || (candidateRoutes && candidateRoutes[0]);
+  const journeyTimes = primaryRoute ? calculateJourneyTimes(departureTime, primaryRoute.currentEtaMin) : null;
+
   return (
     <div className={`relative w-full ${heightClass} bg-[#0f172a] rounded-2xl overflow-hidden border border-slate-800 shadow-lg text-left select-none`}>
       <div className="absolute top-3 left-3 z-20 bg-slate-900/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-slate-700 shadow-md text-xs text-white flex items-center space-x-3">
@@ -345,16 +436,95 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
           <span className="font-mono font-bold tracking-wide">GOOGLE MAPS PLATFORM</span>
         </div>
         <span className="text-slate-500">|</span>
-        <span className="text-slate-300 text-[11px]">Dark Fleet Mode</span>
-        {selectedRoute && (
-          <>
-            <span className="text-slate-500">|</span>
-            <span className="text-emerald-400 font-mono font-bold text-[11px]">
-              {selectedRoute.distanceKm} km · {selectedRoute.currentEtaMin} min
-            </span>
-          </>
-        )}
+        <span className="text-slate-300 text-[11px]">Direction Guidance Active</span>
       </div>
+
+      {/* Google Maps Style Journey Navigation & Timing Card */}
+      {showJourneyRoutes && primaryRoute && journeyTimes && (
+        <div className="absolute top-3 right-3 z-20 w-80 sm:w-96 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-2xl overflow-hidden transition-all duration-200 pointer-events-auto">
+          {/* Card Header: Duration & Live Traffic Badge */}
+          <div className="bg-gradient-to-r from-[#166534] via-[#15803d] to-[#166534] px-4 py-3 text-white flex items-center justify-between shadow-xs">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur-xs border border-white/20 shadow-xs">
+                <Navigation2 className="w-4 h-4 text-white fill-white" />
+              </div>
+              <div>
+                <div className="flex items-baseline space-x-2">
+                  <span className="text-xl font-black tracking-tight">{primaryRoute.currentEtaMin} min</span>
+                  <span className="text-xs font-semibold text-emerald-100">({primaryRoute.distanceKm} km)</span>
+                </div>
+                <div className="text-[11px] text-emerald-100 font-medium flex items-center space-x-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse inline-block"></span>
+                  <span>Fastest route · Typical traffic</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setNavCardExpanded(!navCardExpanded)}
+              className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition flex items-center justify-center cursor-pointer"
+              title={navCardExpanded ? "Minimize navigation card" : "Expand navigation card"}
+            >
+              {navCardExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {/* Expanded Journey Details (From -> To & Pick/Drop Timings) */}
+          {navCardExpanded && (
+            <div className="p-3.5 space-y-3 text-xs bg-white/95">
+              {/* Route Path (Pickup & Drop-off Timings) */}
+              <div className="relative pl-6 space-y-3 before:absolute before:left-2.5 before:top-2.5 before:bottom-2.5 before:w-0.5 before:bg-slate-200">
+                {/* Pickup / Origin */}
+                <div className="relative">
+                  <span className="absolute -left-6 top-0.5 w-3.5 h-3.5 rounded-full bg-[#166534] border-2 border-white ring-2 ring-emerald-200 flex items-center justify-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-bold text-slate-900 text-[12px] truncate max-w-[170px]" title={startLocation || 'Pickup Location'}>
+                      {startLocation || 'Delhi Hub'}
+                    </div>
+                    <div className="shrink-0 font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 font-mono text-[11px] flex items-center space-x-1">
+                      <Clock className="w-3 h-3 text-emerald-600" />
+                      <span>Pickup: {journeyTimes.pickupTime}</span>
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-medium">Origin · Start of Journey</div>
+                </div>
+
+                {/* Drop-off / Destination */}
+                <div className="relative">
+                  <span className="absolute -left-6 top-0.5 w-3.5 h-3.5 rounded-full bg-[#b91c1c] border-2 border-white ring-2 ring-red-200 flex items-center justify-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-bold text-slate-900 text-[12px] truncate max-w-[170px]" title={destinationLocation || 'Drop-off Destination'}>
+                      {destinationLocation || 'Greater Noida Hub'}
+                    </div>
+                    <div className="shrink-0 font-bold text-rose-800 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 font-mono text-[11px] flex items-center space-x-1">
+                      <Clock className="w-3 h-3 text-rose-600" />
+                      <span>Drop: {journeyTimes.dropoffTime}</span>
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-medium">Destination · Expected Arrival</div>
+                </div>
+              </div>
+
+              {/* Bottom Quick Indicator */}
+              <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
+                <span className="font-semibold text-slate-700 truncate max-w-[190px] flex items-center space-x-1">
+                  <span>Corridor:</span>
+                  <strong className="text-slate-900 truncate">{primaryRoute.name}</strong>
+                </span>
+                <span className="inline-flex items-center space-x-1 text-emerald-700 font-bold text-[10px] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                  <ArrowRight className="w-3 h-3 text-emerald-600" />
+                  <span>Direction Arrows Active</span>
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div ref={mapContainerRef} className="w-full h-full" />
 

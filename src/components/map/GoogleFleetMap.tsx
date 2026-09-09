@@ -251,6 +251,18 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
     }
   }, [showTraffic, isLoaded]);
 
+  // Auto-resize observer to seamlessly handle map container expansion/fullscreen
+  useEffect(() => {
+    if (!mapContainerRef.current || !mapInstanceRef.current || typeof google === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      if (mapInstanceRef.current) {
+        google.maps.event.trigger(mapInstanceRef.current, 'resize');
+      }
+    });
+    observer.observe(mapContainerRef.current);
+    return () => observer.disconnect();
+  }, [isLoaded]);
+
   // Render Candidate Routes & Synchronize Draggable Markers
   useEffect(() => {
     if (!isLoaded || !mapInstanceRef.current || typeof google === 'undefined') return;

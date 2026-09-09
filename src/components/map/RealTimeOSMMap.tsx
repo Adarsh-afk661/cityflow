@@ -101,10 +101,23 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
     dropoffTime: string;
   } | null>(null);
   const [navCardExpanded, setNavCardExpanded] = useState(true);
+  const [showTraffic, setShowTraffic] = useState(true);
 
   // Interactive coordinate states
   const [cursorCoords, setCursorCoords] = useState<[number, number] | null>(null);
   const [clickedCoords, setClickedCoords] = useState<[number, number] | null>(null);
+
+  // Auto-resize observer to seamlessly handle map container expansion/fullscreen
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    const observer = new ResizeObserver(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    });
+    observer.observe(mapContainerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   // Initialize Leaflet map instance once
   useEffect(() => {
@@ -295,9 +308,45 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
     // =========================================================================
     // CASE B: ROUTESHIELD JOURNEY MODE (showJourneyRoutes === true)
     // Display planned candidate routes with real distance, duration, hazard markers,
-    // and interactive Google Maps-style route selection.
+    // live road traffic conditions, and interactive Google Maps-style route selection.
     // =========================================================================
     if (!candidateRoutes || candidateRoutes.length === 0) return;
+
+    // 0. RENDER LIVE TRAFFIC PRESSURE CONDITIONS ACROSS CORRIDORS
+    if (showTraffic && cityZones && cityZones.length > 0) {
+      cityZones.forEach(zone => {
+        const centerLat = 28.6139 + (zone.center.y - 300) * 0.0007;
+        const centerLon = 77.2400 + (zone.center.x - 450) * 0.0007;
+
+        const zoneColor =
+          zone.status === 'severe'
+            ? '#ef4444'
+            : zone.status === 'heavy'
+            ? '#f59e0b'
+            : zone.status === 'moderate'
+            ? '#3b82f6'
+            : '#10b981';
+
+        const circle = L.circle([centerLat, centerLon], {
+          radius: 1400,
+          color: zoneColor,
+          fillColor: zoneColor,
+          fillOpacity: 0.16,
+          weight: 1.5
+        }).addTo(routesGroup);
+
+        circle.bindPopup(`
+          <div style="font-family: inherit; min-width: 175px; padding: 2px;">
+            <strong style="color: ${zoneColor}; font-size: 12.5px;">${zone.name}</strong><br/>
+            <div style="font-size: 11px; color: #334155; margin-top: 3px;">
+              <span>Pressure Score: <b>${zone.pressureScore}/100</b></span><br/>
+              <span>Live Flow: <b style="text-transform: uppercase;">${zone.status}</b></span><br/>
+              <span>Average Speed: <b>${zone.avgSpeedKmh} km/h</b></span>
+            </div>
+          </div>
+        `);
+      });
+    }
 
     // Helper: convert [lon, lat] pairs from OSRM coordinates into Leaflet [lat, lon]
     const extractLatLngs = (route: CandidateRoute): L.LatLngExpression[] => {
@@ -944,29 +993,45 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
         </div>
       )}
 
-      {/* Search Header Bar (Real-Time OSM Geocoding) */}
-      <div className="absolute top-3 left-3 right-3 sm:right-auto sm:w-96 z-10">
-        <form onSubmit={handleSearch} className="relative flex items-center shadow-md rounded-xl">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search address or location worldwide..."
-            className="w-full bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl pl-9 pr-20 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#166534] font-medium"
-          />
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
+      {/* Search Header Bar with Live Traffic Toggle (Real-Time OSM) */}
+      <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5 max-w-[calc(100%-80px)] sm:max-w-none pointer-events-auto">
+        <div className="flex flex-wrap items-center gap-2">
+          <form onSubmit={handleSearch} className="relative flex items-center shadow-md rounded-xl w-64 sm:w-80">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search address or location..."
+              className="w-full bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl pl-8 pr-16 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#166534] font-medium"
+            />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+            <button
+              type="submit"
+              disabled={isSearching}
+              className="absolute right-1 px-2.5 py-1 rounded-lg bg-[#166534] hover:bg-[#14532d] text-white text-[11px] font-bold transition flex items-center space-x-1 cursor-pointer"
+            >
+              {isSearching ? <Loader2 className="w-3 h-3 animate-spin" /> : <span>Search</span>}
+            </button>
+          </form>
+
           <button
-            type="submit"
-            disabled={isSearching}
-            className="absolute right-1 px-3 py-1 rounded-lg bg-[#166534] hover:bg-[#14532d] text-white text-xs font-bold transition flex items-center space-x-1"
+            type="button"
+            onClick={() => setShowTraffic(!showTraffic)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md border cursor-pointer ${
+              showTraffic
+                ? 'bg-[#166534] text-white border-emerald-500 shadow-emerald-950/20'
+                : 'bg-white/95 text-slate-700 border-slate-200 hover:bg-slate-50'
+            }`}
+            title="Toggle Live Traffic Flow Layer"
           >
-            {isSearching ? <Loader2 className="w-3 h-3 animate-spin" /> : <span>Search</span>}
+            <span className="text-xs">🚦</span>
+            <span>Traffic: {showTraffic ? 'LIVE' : 'OFF'}</span>
           </button>
-        </form>
+        </div>
 
         {/* Autocomplete dropdown */}
         {searchResults.length > 1 && (
-          <div className="mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden text-xs max-h-48 overflow-y-auto">
+          <div className="mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden text-xs max-h-48 overflow-y-auto w-64 sm:w-80">
             {searchResults.map((item, idx) => (
               <button
                 key={idx}

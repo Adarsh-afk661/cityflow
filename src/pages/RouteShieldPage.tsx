@@ -11,7 +11,9 @@ import {
   Clock,
   Navigation,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { RoutePlanner } from '../components/routeshield/RoutePlanner';
 import { RouteCard } from '../components/routeshield/RouteCard';
@@ -68,6 +70,7 @@ export const RouteShieldPage: React.FC = () => {
 
   const [compareModalOpen, setCompareModalOpen] = useState(false);
   const [rerouteFeedback, setRerouteFeedback] = useState<string | null>(null);
+  const [isMapExpanded, setIsMapExpanded] = useState(false);
 
   const failedRoutes = candidateRoutes.filter(r => r.clearanceStatus === 'failed');
   const approvedRoutes = candidateRoutes.filter(r => r.clearanceStatus === 'approved');
@@ -205,8 +208,8 @@ export const RouteShieldPage: React.FC = () => {
 
       {/* Interactive Map & Routes Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Candidate Routes List (7 cols) */}
-        <div className="lg:col-span-7 space-y-4">
+        {/* Candidate Routes List */}
+        <div className={`${isMapExpanded ? 'lg:col-span-12' : 'lg:col-span-7'} space-y-4`}>
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider font-mono flex items-center space-x-2">
               <span>Candidate Routes</span>
@@ -214,9 +217,23 @@ export const RouteShieldPage: React.FC = () => {
                 ({startLocation} → {destinationLocation})
               </span>
             </h3>
-            <span className="text-xs text-slate-600 font-mono">
-              Vehicle: <strong className="text-slate-900">{selectedVehicle.height}m H</strong> / {selectedVehicle.weight}T
-            </span>
+            <div className="flex items-center space-x-3">
+              <span className="text-xs text-slate-600 font-mono">
+                Vehicle: <strong className="text-slate-900">{selectedVehicle.height}m H</strong> / {selectedVehicle.weight}T
+              </span>
+              {/* If map is compact, provide quick button to expand map right here too */}
+              {!isMapExpanded && (
+                <button
+                  type="button"
+                  onClick={() => setIsMapExpanded(true)}
+                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-[#166534] border border-emerald-300 rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer shadow-xs"
+                  title="Map ko Poora Bada Karein"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                  <span>Map Bada Karein</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Clearance Notice Banner if any routes failed */}
@@ -230,7 +247,7 @@ export const RouteShieldPage: React.FC = () => {
           )}
 
           {/* Render Candidate Cards */}
-          <div className="space-y-4">
+          <div className={isMapExpanded ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : "space-y-4"}>
             {candidateRoutes.map(route => (
               <RouteCard
                 key={route.id}
@@ -240,11 +257,11 @@ export const RouteShieldPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Final Optimal Route Recommendation Card */}
+          {/* Optimal Corridor Highlight / Dispatch Decision Card */}
           {recommendedRoute && (
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-[#064e3b] via-slate-900 to-[#022c22] text-white border border-emerald-500/50 shadow-xl space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-500/30 pb-3">
-                <div className="flex items-center space-x-2.5">
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 border border-emerald-500/50 shadow-lg text-white space-y-3 animate-in fade-in duration-300">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                <div className="flex items-center space-x-3">
                   <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300">
                     <Sparkles className="w-4 h-4" />
                   </div>
@@ -314,113 +331,156 @@ export const RouteShieldPage: React.FC = () => {
           )}
         </div>
 
-        {/* Live Map Inspector (5 cols) */}
-        <div className="lg:col-span-5 sticky top-24 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider font-mono flex items-center space-x-1.5">
-              <MapPin className="w-3.5 h-3.5 text-[#166534]" />
-              <span>Route Geometry Visualizer</span>
-            </h3>
-            {selectedRoute && (
-              <span className="text-[11px] font-mono text-[#166534] font-bold">
-                {selectedRoute.name.split('—')[0]} SELECTED
-              </span>
-            )}
-          </div>
+        {/* Live Map Inspector (5 cols when normal, 12 cols when expanded at top) */}
+        {(() => {
+          const activeRoute = selectedRoute || (candidateRoutes && candidateRoutes[0]);
+          const times = activeRoute ? calculateJourneyTimes(departureTime, activeRoute.currentEtaMin) : null;
 
-          {/* Google Maps Style Journey Navigation & Timing HUD */}
-          {(() => {
-            const activeRoute = selectedRoute || (candidateRoutes && candidateRoutes[0]);
-            if (!activeRoute) return null;
-            const times = calculateJourneyTimes(departureTime, activeRoute.currentEtaMin);
-            return (
-              <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-md text-xs space-y-2.5 animate-in fade-in duration-200">
-                {/* Header: ETA Duration & Status */}
-                <div className="flex items-center justify-between bg-gradient-to-r from-[#166534] to-[#15803d] text-white p-2.5 rounded-xl shadow-xs">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
-                      <Navigation className="w-3.5 h-3.5 text-white" />
-                    </div>
-                    <div>
-                      <div className="flex items-baseline space-x-1.5">
-                        <span className="text-base font-black leading-none">{activeRoute.currentEtaMin} min</span>
-                        <span className="text-[11px] font-medium text-emerald-100">({activeRoute.distanceKm} km)</span>
+          return (
+            <div className={`${isMapExpanded ? 'lg:col-span-12 order-first' : 'lg:col-span-5 sticky top-24'} space-y-3 transition-all duration-300`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider font-mono flex items-center space-x-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-[#166534]" />
+                    <span>Route Geometry & Real-Time Traffic Visualizer</span>
+                  </h3>
+                  {isMapExpanded && (
+                    <span className="text-[10px] bg-emerald-100 text-[#166534] border border-emerald-300 px-2 py-0.5 rounded font-mono font-bold">
+                      WIDE VIEW ACTIVE
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  {/* Inline Toggle: Bada Karein / Chota Karein */}
+                  <button
+                    type="button"
+                    onClick={() => setIsMapExpanded(!isMapExpanded)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-xs ${
+                      isMapExpanded
+                        ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                        : 'bg-emerald-50 hover:bg-emerald-100 text-[#166534] border border-emerald-300'
+                    }`}
+                    title={isMapExpanded ? "Map Chota Karein (Side-by-Side)" : "Map Bada Karein (Wide View)"}
+                  >
+                    {isMapExpanded ? (
+                      <>
+                        <Minimize2 className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Chota Karein (Side-by-Side)</span>
+                      </>
+                    ) : (
+                      <>
+                        <Maximize2 className="w-3.5 h-3.5 text-[#166534]" />
+                        <span>Bada Karein (Wide View)</span>
+                      </>
+                    )}
+                  </button>
+
+                  {selectedRoute && (
+                    <span className="text-[11px] font-mono text-[#166534] font-bold hidden sm:inline">
+                      {selectedRoute.name.split('—')[0]} SELECTED
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Google Maps Style Journey Navigation & Timing HUD */}
+              {activeRoute && times && (
+                <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-md text-xs space-y-2.5 animate-in fade-in duration-200">
+                  {/* Header: ETA Duration & Status */}
+                  <div className="flex items-center justify-between bg-gradient-to-r from-[#166534] to-[#15803d] text-white p-2.5 rounded-xl shadow-xs">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
+                        <Navigation className="w-3.5 h-3.5 text-white" />
                       </div>
-                      <div className="text-[10px] text-emerald-200 font-medium">Fastest route · Typical traffic</div>
+                      <div>
+                        <div className="flex items-baseline space-x-1.5">
+                          <span className="text-base font-black leading-none">{activeRoute.currentEtaMin} min</span>
+                          <span className="text-[11px] font-medium text-emerald-100">({activeRoute.distanceKm} km)</span>
+                        </div>
+                        <div className="text-[10px] text-emerald-200 font-medium">Fastest route · Typical traffic</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-mono font-bold bg-white/20 px-2 py-0.5 rounded text-white">
+                        {activeRoute.clearanceStatus === 'approved' ? 'SAFE CORRIDOR' : 'BARRED'}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-[10px] font-mono font-bold bg-white/20 px-2 py-0.5 rounded text-white">
-                      {activeRoute.clearanceStatus === 'approved' ? 'SAFE CORRIDOR' : 'BARRED'}
+
+                  {/* From ➔ To & Pick/Drop Timings */}
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    {/* Origin / Pickup */}
+                    <div className="bg-slate-50 border border-slate-200 p-2 rounded-xl flex flex-col justify-between">
+                      <div className="flex items-center space-x-1 text-[#166534] font-bold text-[10px] uppercase">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#166534]"></span>
+                        <span>Pickup (Start)</span>
+                      </div>
+                      <div className="font-bold text-slate-800 truncate mt-0.5" title={startLocation}>
+                        {startLocation || 'Delhi Hub'}
+                      </div>
+                      <div className="mt-1 font-mono font-bold text-[#166534] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 text-[10.5px] flex items-center space-x-1">
+                        <Clock className="w-3 h-3 text-[#166534]" />
+                        <span>{times.pickupTime}</span>
+                      </div>
+                    </div>
+
+                    {/* Destination / Drop-off */}
+                    <div className="bg-slate-50 border border-slate-200 p-2 rounded-xl flex flex-col justify-between">
+                      <div className="flex items-center space-x-1 text-[#b91c1c] font-bold text-[10px] uppercase">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#b91c1c]"></span>
+                        <span>Drop-off (End)</span>
+                      </div>
+                      <div className="font-bold text-slate-800 truncate mt-0.5" title={destinationLocation}>
+                        {destinationLocation || 'Greater Noida Hub'}
+                      </div>
+                      <div className="mt-1 font-mono font-bold text-[#b91c1c] bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 text-[10.5px] flex items-center space-x-1">
+                        <Clock className="w-3 h-3 text-[#b91c1c]" />
+                        <span>{times.dropoffTime}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sub-bar: Direction Guidance notice */}
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-100">
+                    <span className="font-medium text-slate-700 flex items-center space-x-1">
+                      <span>Corridor:</span>
+                      <strong className="text-slate-900 truncate max-w-[150px]">{activeRoute.name}</strong>
+                    </span>
+                    <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 flex items-center space-x-1">
+                      <ArrowRight className="w-2.5 h-2.5" />
+                      <span>Direction Arrows Active</span>
                     </span>
                   </div>
                 </div>
+              )}
 
-                {/* From ➔ To & Pick/Drop Timings */}
-                <div className="grid grid-cols-2 gap-2 text-[11px]">
-                  {/* Origin / Pickup */}
-                  <div className="bg-slate-50 border border-slate-200 p-2 rounded-xl flex flex-col justify-between">
-                    <div className="flex items-center space-x-1 text-[#166534] font-bold text-[10px] uppercase">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#166534]"></span>
-                      <span>Pickup (Start)</span>
-                    </div>
-                    <div className="font-bold text-slate-800 truncate mt-0.5" title={startLocation}>
-                      {startLocation || 'Delhi Hub'}
-                    </div>
-                    <div className="mt-1 font-mono font-bold text-[#166534] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 text-[10.5px] flex items-center space-x-1">
-                      <Clock className="w-3 h-3 text-[#166534]" />
-                      <span>{times.pickupTime}</span>
-                    </div>
+              {/* Real-time Map with height adjustment and expand sync */}
+              <CityMap
+                heightClass={isMapExpanded ? 'h-[620px]' : 'h-[440px]'}
+                showControls={true}
+                showJourneyRoutes={true}
+                onToggleExpand={() => setIsMapExpanded(!isMapExpanded)}
+                isExpandedInline={isMapExpanded}
+              />
+
+              {/* Selected Route Quick Telemetry bar */}
+              {selectedRoute && (
+                <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm text-xs">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-bold text-slate-900">{selectedRoute.name}</span>
+                    <span className="font-mono text-[#166534] font-bold">
+                      {selectedRoute.reliabilityScore}/100 Reliability
+                    </span>
                   </div>
-
-                  {/* Destination / Drop-off */}
-                  <div className="bg-slate-50 border border-slate-200 p-2 rounded-xl flex flex-col justify-between">
-                    <div className="flex items-center space-x-1 text-[#b91c1c] font-bold text-[10px] uppercase">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#b91c1c]"></span>
-                      <span>Drop-off (End)</span>
-                    </div>
-                    <div className="font-bold text-slate-800 truncate mt-0.5" title={destinationLocation}>
-                      {destinationLocation || 'Greater Noida Hub'}
-                    </div>
-                    <div className="mt-1 font-mono font-bold text-[#b91c1c] bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 text-[10.5px] flex items-center space-x-1">
-                      <Clock className="w-3 h-3 text-[#b91c1c]" />
-                      <span>{times.dropoffTime}</span>
-                    </div>
-                  </div>
+                  <p className="text-slate-500 text-[11px] leading-relaxed">
+                    {selectedRoute.description}
+                  </p>
                 </div>
-
-                {/* Sub-bar: Direction Guidance notice */}
-                <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-100">
-                  <span className="font-medium text-slate-700 flex items-center space-x-1">
-                    <span>Corridor:</span>
-                    <strong className="text-slate-900 truncate max-w-[150px]">{activeRoute.name}</strong>
-                  </span>
-                  <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 flex items-center space-x-1">
-                    <ArrowRight className="w-2.5 h-2.5" />
-                    <span>Direction Arrows Active</span>
-                  </span>
-                </div>
-              </div>
-            );
-          })()}
-
-          <CityMap heightClass="h-[430px]" showControls={true} showJourneyRoutes={true} />
-
-          {/* Selected Route Quick Telemetry bar */}
-          {selectedRoute && (
-            <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm text-xs">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="font-bold text-slate-900">{selectedRoute.name}</span>
-                <span className="font-mono text-[#166534] font-bold">
-                  {selectedRoute.reliabilityScore}/100 Reliability
-                </span>
-              </div>
-              <p className="text-slate-500 text-[11px] leading-relaxed">
-                {selectedRoute.description}
-              </p>
+              )}
             </div>
-          )}
-        </div>
+          );
+        })()}
       </div>
 
       {/* Animated Analysis Modal */}

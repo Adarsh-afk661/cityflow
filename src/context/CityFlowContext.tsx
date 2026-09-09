@@ -19,6 +19,7 @@ import { predictJourneyReliability } from '../services/reliabilityEngine';
 import { calculateSafetyScore } from '../services/safetyEngine';
 import { calculateEmissions } from '../services/emissionEngine';
 import { rankCandidateRoutes } from '../services/rankingEngine';
+import { getCorridorCoordinates } from '../data/corridorRoutes';
 
 export type PageName = 'landing' | 'dashboard' | 'routeshield' | 'fleet' | 'whatif' | 'analytics' | 'alerts' | 'settings';
 
@@ -251,6 +252,7 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
     destLoc: string = destinationLocation
   ): CandidateRoute[] => {
     const metrics = getCorridorMetrics(startLoc, destLoc);
+    const coords = getCorridorCoordinates(startLoc, destLoc);
 
     const rawRoutes = INITIAL_BASE_ROUTES.map(baseRoute => {
       const m = metrics[baseRoute.id as keyof typeof metrics] || {
@@ -261,6 +263,7 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
       };
       const effectiveDist = m.dist;
       const effectiveBaseDur = m.dur;
+      const routeCoords = coords[baseRoute.id as keyof typeof coords] || baseRoute.realCoordinates;
 
       // 1. Physical Clearance Validation
       const clearanceEval = evaluateRouteClearance(veh, baseRoute.infrastructureEncountered);
@@ -302,7 +305,8 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
         estimatedCo2Kg: emissions.estimatedCo2Kg,
         fuelImpactLiters: emissions.fuelImpactLiters,
         clearanceStatus: clearanceEval.status,
-        clearanceChecks: clearanceEval.checks
+        clearanceChecks: clearanceEval.checks,
+        realCoordinates: routeCoords
       };
     });
 
@@ -528,15 +532,30 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
     } catch (e) {}
   };
 
-  // Re-evaluate routes when routing mode or vehicle changes
+  // Re-evaluate routes dynamically when routing mode, destination, or vehicle changes
   useEffect(() => {
-    const updated = evaluateRoutes(selectedVehicle, routingMode);
+    const updated = evaluateRoutes(selectedVehicle, routingMode, startLocation, destinationLocation);
     setCandidateRoutes(updated);
-    if (selectedRoute) {
-      const match = updated.find(r => r.id === selectedRoute.id);
-      if (match) setSelectedRoute(match);
+
+    // Select the best matching route for the active preference
+    let targetRoute: CandidateRoute | undefined;
+    if (routingMode === 'fastest') {
+      targetRoute = [...updated].sort((a, b) => a.currentEtaMin - b.currentEtaMin).find(r => r.clearanceStatus === 'approved') || updated[0];
+    } else if (routingMode === 'eco') {
+      targetRoute = [...updated].sort((a, b) => a.estimatedCo2Kg - b.estimatedCo2Kg).find(r => r.clearanceStatus === 'approved') || updated[2] || updated[0];
+    } else if (routingMode === 'reliable') {
+      targetRoute = [...updated].sort((a, b) => b.reliabilityScore - a.reliabilityScore).find(r => r.clearanceStatus === 'approved') || updated[1] || updated[0];
+    } else if (routingMode === 'clearance') {
+      targetRoute = updated.find(r => r.clearanceStatus === 'approved') || updated[1] || updated[0];
+    } else {
+      // Balanced
+      targetRoute = updated.find(r => r.isRecommended) || updated.find(r => r.clearanceStatus === 'approved') || updated[0];
     }
-  }, [routingMode, selectedVehicle]);
+
+    if (targetRoute) {
+      setSelectedRoute(targetRoute);
+    }
+  }, [routingMode, selectedVehicle, startLocation, destinationLocation]);
 
   // Demo Workflow: Executes the 38-step demo story seamlessly
   const startGuidedDemo = async () => {

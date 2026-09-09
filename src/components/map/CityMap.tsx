@@ -52,7 +52,7 @@ export const CityMap: React.FC<CityMapProps> = ({
   return (
     <>
       <div className={`relative w-full ${heightClass} bg-[#0f172a] rounded-2xl overflow-hidden border border-slate-800 shadow-sm select-none group text-left transition-all duration-300`}>
-        {/* Map Mode Switcher & Bada Karein Fullscreen Action Bar - bottom-right */}
+        {/* Map Mode Switcher & Fullscreen Action Bar - bottom-right */}
         {showControls && (
           <div className="absolute z-30 bottom-3 right-3 flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-700 shadow-xl">
             {/* Inline Expand Toggle if provided */}
@@ -61,7 +61,7 @@ export const CityMap: React.FC<CityMapProps> = ({
                 type="button"
                 onClick={onToggleExpand}
                 className="px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
-                title={isExpandedInline ? "Side-by-Side (Chota) View" : "Full-Width (Bada) View"}
+                title={isExpandedInline ? "Side-by-Side View" : "Wide View"}
               >
                 <Maximize2 className="w-3.5 h-3.5 text-blue-400" />
                 <span className="hidden sm:inline">{isExpandedInline ? 'Normal View' : 'Wide View'}</span>
@@ -73,10 +73,10 @@ export const CityMap: React.FC<CityMapProps> = ({
               type="button"
               onClick={() => setIsFullscreen(true)}
               className="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 shadow-xs"
-              title="Map ko Poora Bada Karein (Fullscreen)"
+              title="Full Screen Mode"
             >
               <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
-              <span>Bada Karein (Fullscreen)</span>
+              <span>Full Screen</span>
             </button>
 
             {/* Google vs OSM Switcher */}
@@ -114,7 +114,7 @@ export const CityMap: React.FC<CityMapProps> = ({
         )}
       </div>
 
-      {/* Fullscreen Bada Map Modal Overlay */}
+      {/* Fullscreen Map Modal Overlay */}
       {isFullscreen && (
         <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-xl p-3 sm:p-5 flex flex-col animate-in fade-in zoom-in-95 duration-150">
           {/* Top Fullscreen Header */}
@@ -129,7 +129,7 @@ export const CityMap: React.FC<CityMapProps> = ({
                     CityFlow Panoramic Map & Live Traffic Inspector
                   </h3>
                   <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-mono font-bold border border-emerald-500/40">
-                    FULLSCREEN (BADA VIEW)
+                    FULLSCREEN
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-400 flex items-center space-x-2 mt-0.5">
@@ -175,10 +175,10 @@ export const CityMap: React.FC<CityMapProps> = ({
                 type="button"
                 onClick={() => setIsFullscreen(false)}
                 className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-md"
-                title="Chota Karein / Normal View (Esc)"
+                title="Exit Fullscreen (Esc)"
               >
                 <Minimize2 className="w-4 h-4" />
-                <span>Chota Karein (Esc)</span>
+                <span>Exit Fullscreen (Esc)</span>
               </button>
             </div>
           </div>

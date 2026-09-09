@@ -227,10 +227,10 @@ export const RouteShieldPage: React.FC = () => {
                   type="button"
                   onClick={() => setIsMapExpanded(true)}
                   className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-[#166534] border border-emerald-300 rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer shadow-xs"
-                  title="Map ko Poora Bada Karein"
+                  title="Expand Map View"
                 >
                   <Maximize2 className="w-3.5 h-3.5" />
-                  <span>Map Bada Karein</span>
+                  <span>Expand Map</span>
                 </button>
               )}
             </div>
@@ -352,7 +352,7 @@ export const RouteShieldPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  {/* Inline Toggle: Bada Karein / Chota Karein */}
+                  {/* Inline Toggle: Expand / Collapse View */}
                   <button
                     type="button"
                     onClick={() => setIsMapExpanded(!isMapExpanded)}
@@ -361,17 +361,17 @@ export const RouteShieldPage: React.FC = () => {
                         ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
                         : 'bg-emerald-50 hover:bg-emerald-100 text-[#166534] border border-emerald-300'
                     }`}
-                    title={isMapExpanded ? "Map Chota Karein (Side-by-Side)" : "Map Bada Karein (Wide View)"}
+                    title={isMapExpanded ? "Collapse View (Side-by-Side)" : "Expand Map (Wide View)"}
                   >
                     {isMapExpanded ? (
                       <>
                         <Minimize2 className="w-3.5 h-3.5 text-blue-400" />
-                        <span>Chota Karein (Side-by-Side)</span>
+                        <span>Collapse View</span>
                       </>
                     ) : (
                       <>
                         <Maximize2 className="w-3.5 h-3.5 text-[#166534]" />
-                        <span>Bada Karein (Wide View)</span>
+                        <span>Expand View</span>
                       </>
                     )}
                   </button>

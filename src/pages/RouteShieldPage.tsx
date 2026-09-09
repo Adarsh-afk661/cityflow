@@ -9,7 +9,9 @@ import {
   Columns,
   MapPin,
   Clock,
-  Navigation
+  Navigation,
+  Sparkles,
+  ShieldCheck
 } from 'lucide-react';
 import { RoutePlanner } from '../components/routeshield/RoutePlanner';
 import { RouteCard } from '../components/routeshield/RouteCard';
@@ -237,6 +239,79 @@ export const RouteShieldPage: React.FC = () => {
               />
             ))}
           </div>
+
+          {/* Final Optimal Route Recommendation Card */}
+          {recommendedRoute && (
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-[#064e3b] via-slate-900 to-[#022c22] text-white border border-emerald-500/50 shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-500/30 pb-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono font-black text-emerald-400 tracking-wider uppercase">
+                      FINAL DISPATCH DECISION · RECOMMENDED
+                    </span>
+                    <h4 className="text-base font-extrabold text-white flex items-center space-x-1.5">
+                      <span>Optimal Corridor:</span>
+                      <span className="text-emerald-300">{recommendedRoute.name}</span>
+                    </h4>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                    Score: {recommendedRoute.overallScore}/100
+                  </span>
+                  {selectedRoute?.id === recommendedRoute.id ? (
+                    <span className="px-3 py-1.5 bg-emerald-500 text-slate-950 rounded-xl text-xs font-black shadow-sm">
+                      ACTIVE ON MAP
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleApplyReroute(recommendedRoute)}
+                      className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-black transition cursor-pointer shadow-md"
+                    >
+                      Apply Optimal Route ➔
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Key Decision Pillars */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                <div className="bg-white/5 border border-white/10 p-2.5 rounded-xl">
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">Clearance</div>
+                  <div className="text-emerald-400 font-extrabold text-xs mt-0.5 flex items-center space-x-1">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>100% Passed</span>
+                  </div>
+                </div>
+                <div className="bg-white/5 border border-white/10 p-2.5 rounded-xl">
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">Predicted ETA</div>
+                  <div className="text-white font-extrabold text-xs mt-0.5">
+                    {recommendedRoute.currentEtaMin} min ({recommendedRoute.distanceKm} km)
+                  </div>
+                </div>
+                <div className="bg-white/5 border border-white/10 p-2.5 rounded-xl">
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">Reliability</div>
+                  <div className="text-emerald-300 font-extrabold text-xs mt-0.5">
+                    {recommendedRoute.reliabilityScore}% ({recommendedRoute.delayRiskPercent}% delay risk)
+                  </div>
+                </div>
+                <div className="bg-white/5 border border-white/10 p-2.5 rounded-xl">
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">Eco Impact</div>
+                  <div className="text-teal-300 font-extrabold text-xs mt-0.5">
+                    {recommendedRoute.estimatedCo2Kg} kg CO₂ ({recommendedRoute.co2SavingsKg} kg saved)
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed">
+                <b>Why this is optimal:</b> {recommendedRoute.description} It delivers the safest clearance fit for <b>{selectedVehicle.name}</b> ({selectedVehicle.height}m H / {selectedVehicle.weight}T) with the lowest probability of delays and zero municipal clearance penalties.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Live Map Inspector (5 cols) */}

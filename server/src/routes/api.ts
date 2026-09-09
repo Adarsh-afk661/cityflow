@@ -926,6 +926,53 @@ router.post('/routes/simulate', async (req: Request, res: Response) => {
   return handleJourneyAnalysis(req, res);
 });
 
+// Live Geocoding Endpoint for Free-form Delhi & Global Location Input
+router.get('/map/geocode', async (req: Request, res: Response) => {
+  try {
+    const q = (req.query.q as string)?.trim();
+    if (!q || q.length < 2) {
+      return res.json([]);
+    }
+
+    // 1. Try Nominatim with Delhi-NCR context prioritised
+    try {
+      const searchTarget = (q.toLowerCase().includes('delhi') || q.toLowerCase().includes('noida') || q.toLowerCase().includes('gurgaon') || q.toLowerCase().includes('ghaziabad'))
+        ? q
+        : `${q}, Delhi NCR, India`;
+
+      const encoded = encodeURIComponent(searchTarget);
+      const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&addressdetails=1&limit=6`;
+      const response = await fetch(nominatimUrl, {
+        headers: {
+          'User-Agent': 'CityFlow-Route-Intelligence/2.0 (operations@cityflow.dev)'
+        },
+        signal: AbortSignal.timeout(3500)
+      });
+
+      if (response.ok) {
+        const data = (await response.json()) as any[];
+        if (Array.isArray(data) && data.length > 0) {
+          return res.json(data);
+        }
+      }
+    } catch (nomErr) {
+      // Continue to local registry
+    }
+
+    // 2. High-precision fallback via local registry & spatial parser
+    const geo = await geocodeLocation(q);
+    return res.json([{
+      display_name: geo.displayName,
+      lat: geo.lat.toString(),
+      lon: geo.lon.toString(),
+      category: 'landmark',
+      address: { city: 'Delhi-NCR' }
+    }]);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Geocoding failed', message: err.message });
+  }
+});
+
 // Live Weather Endpoint
 router.get('/weather', async (req: Request, res: Response) => {
   try {

@@ -268,10 +268,11 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
 
     const bounds = new google.maps.LatLngBounds();
 
-    // 1. Draw each candidate route
-    candidateRoutes.forEach(route => {
+    // 1. Draw each candidate route (ALL corridors rendered simultaneously, none skipped)
+    candidateRoutes.forEach((route, idx) => {
       const isSelected = selectedRoute?.id === route.id;
       const isFailed = route.clearanceStatus === 'failed';
+      const isOptimal = route.isRecommended;
 
       let pathLatLngs: Array<{ lat: number; lng: number }> = [];
       if ((route as any).realCoordinates && (route as any).realCoordinates.length > 0) {
@@ -290,26 +291,35 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
 
       pathLatLngs.forEach(pt => bounds.extend(pt));
 
-      let strokeColor = '#64748b';
-      let strokeWeight = 4;
-      let strokeOpacity = 0.7;
-      let zIndex = 2;
-
+      let strokeColor = '#3b82f6';
       if (isFailed) {
-        strokeColor = '#ef4444';
-        strokeWeight = 3.5;
-        strokeOpacity = 0.85;
-        zIndex = 1;
-      } else if (isSelected) {
-        strokeColor = '#10b981';
-        strokeWeight = 6;
-        strokeOpacity = 0.95;
-        zIndex = 10;
-      } else if (route.isRecommended) {
-        strokeColor = '#3b82f6';
-        strokeWeight = 4.5;
-        strokeOpacity = 0.8;
-        zIndex = 5;
+        strokeColor = isSelected ? '#b91c1c' : '#ef4444';
+      } else if (isOptimal) {
+        strokeColor = isSelected ? '#15803d' : '#16a34a';
+      } else if (route.id === 'route-a' || route.name.toLowerCase().includes('route a')) {
+        strokeColor = isSelected ? '#c2410c' : '#ea580c';
+      } else if (route.id === 'route-b' || route.name.toLowerCase().includes('route b')) {
+        strokeColor = isSelected ? '#1d4ed8' : '#2563eb';
+      } else {
+        strokeColor = isSelected ? '#0f766e' : '#0d9488';
+      }
+
+      const zIndex = isSelected ? 25 : isOptimal ? 18 : (10 - idx);
+      const strokeWeight = isSelected ? 6.5 : isOptimal ? 5.5 : 4.5;
+      const strokeOpacity = isSelected ? 1.0 : isOptimal ? 0.95 : 0.8;
+
+      // Outer glow for optimal corridor
+      if (isOptimal) {
+        const haloPolyline = new google.maps.Polyline({
+          path: pathLatLngs,
+          geodesic: true,
+          strokeColor: '#4ade80',
+          strokeOpacity: 0.35,
+          strokeWeight: 14,
+          zIndex: zIndex - 1,
+          map
+        });
+        polylinesRef.current.push(haloPolyline);
       }
 
       const polyline = new google.maps.Polyline({
@@ -328,8 +338,8 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
             fillColor: strokeColor,
             fillOpacity: 1
           },
-          offset: '25px',
-          repeat: '80px'
+          offset: '30px',
+          repeat: '85px'
         }],
         map
       });
@@ -339,6 +349,39 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
       });
 
       polylinesRef.current.push(polyline);
+
+      // Midpoint Interactive Label Marker on Google Map
+      const midIdx = Math.floor(pathLatLngs.length * Math.min(0.75, 0.32 + idx * 0.20));
+      const midPos = pathLatLngs[midIdx];
+      if (midPos) {
+        const pillText = `${isOptimal ? '★ ' : ''}${route.name.split('—')[0].trim()} · ${route.currentEtaMin}m`;
+        const midMarker = new google.maps.Marker({
+          position: midPos,
+          map,
+          title: `${route.name}: ${route.currentEtaMin} min ETA (Click to select)`,
+          label: {
+            text: pillText,
+            color: '#ffffff',
+            fontSize: '10px',
+            fontWeight: 'bold'
+          },
+          icon: {
+            path: 'M -55 -12 L 55 -12 A 12 12 0 0 1 55 12 L -55 12 A 12 12 0 0 1 -55 -12 Z',
+            fillColor: isOptimal ? '#166534' : isFailed ? '#991b1b' : strokeColor,
+            fillOpacity: 1,
+            strokeColor: isOptimal ? '#86efac' : '#ffffff',
+            strokeWeight: 2,
+            scale: 1
+          },
+          zIndex: isSelected ? 35 : isOptimal ? 28 : 15
+        });
+
+        midMarker.addListener('click', () => {
+          setSelectedRoute(route);
+        });
+
+        markersRef.current.push(midMarker);
+      }
     });
 
     // 2. Add Draggable Origin (A) and Destination (B) Markers
@@ -670,6 +713,44 @@ export const GoogleFleetMap: React.FC<GoogleFleetMapProps> = ({
                   <div className="text-[10px] text-slate-500 font-medium">Destination · Stop B (Drag pin to move)</div>
                 </div>
               </div>
+
+              {/* All Corridors Quick Switcher (No Routes Skipped) */}
+              {candidateRoutes && candidateRoutes.length > 1 && (
+                <div className="pt-2 border-t border-slate-100">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                    <span>All Corridors ({candidateRoutes.length})</span>
+                    <span className="text-[#166534] font-mono font-extrabold text-[9px] bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">NO ROUTES SKIPPED</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {candidateRoutes.map((r, idx) => {
+                      const isSel = (selectedRoute?.id === r.id) || (!selectedRoute && idx === 0);
+                      const isOpt = r.isRecommended;
+                      const isBar = r.clearanceStatus === 'failed';
+                      return (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => setSelectedRoute(r)}
+                          className={`p-1.5 rounded-lg border text-left transition cursor-pointer flex flex-col justify-between ${
+                            isSel
+                              ? 'bg-slate-900 border-slate-900 text-white shadow-xs'
+                              : 'bg-slate-50 hover:bg-emerald-50 border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-[10.5px]">{r.name.split('—')[0].trim()}</span>
+                            {isOpt && <span className="text-[7.5px] bg-emerald-400 text-slate-950 font-black px-1 rounded uppercase">★ OPT</span>}
+                          </div>
+                          <div className="text-[9.5px] font-mono mt-0.5 flex items-center justify-between">
+                            <span>{r.currentEtaMin}m</span>
+                            {isBar ? <span className="text-rose-400 font-bold text-[8.5px]">BARRED</span> : <span className="text-emerald-500 text-[8.5px]">SAFE</span>}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Bottom Quick Indicator */}
               <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">

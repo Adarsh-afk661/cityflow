@@ -234,15 +234,22 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [demoStep, setDemoStep] = useState<number>(0);
   const [demoFinalModalOpen, setDemoFinalModalOpen] = useState<boolean>(false);
 
-  // Helper to resolve coordinates for any location name in Delhi or worldwide
+  // Helper to resolve coordinates for any custom location name in Delhi or worldwide
   const resolveCoordinates = async (query: string, fallback: [number, number]): Promise<[number, number]> => {
     if (!query || !query.trim()) return fallback;
-    const places = searchDelhiPlaces(query, 1);
-    if (places.length > 0 && places[0].lat && places[0].lon) {
-      return [places[0].lat, places[0].lon];
+    const cleanQ = query.trim();
+
+    // 1. Direct coordinate check
+    const coordMatch = cleanQ.match(/^([-+]?\d+(\.\d+)?)[,\s]+([-+]?\d+(\.\d+)?)$/);
+    if (coordMatch) {
+      const lat = parseFloat(coordMatch[1]);
+      const lon = parseFloat(coordMatch[3]);
+      if (!isNaN(lat) && !isNaN(lon)) return [lat, lon];
     }
+
+    // 2. Query backend geocoder endpoint (backed by Nominatim & local logistics index)
     try {
-      const res = await fetch(`/api/map/geocode?q=${encodeURIComponent(query)}`);
+      const res = await fetch(`/api/map/geocode?q=${encodeURIComponent(cleanQ)}`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -252,6 +259,13 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
       }
     } catch (e) {}
+
+    // 3. Delhi NCR instant catalog & sector heuristic
+    const places = searchDelhiPlaces(cleanQ, 1);
+    if (places.length > 0 && places[0].lat && places[0].lon) {
+      return [places[0].lat, places[0].lon];
+    }
+
     return fallback;
   };
 
@@ -352,9 +366,24 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
     setIsAnalyzing(true);
     setAnalysisStage(0);
 
-    // Resolve exact GPS coordinates
-    const effectiveSCoords = sCoordsOverride || startCoords || await resolveCoordinates(startTarget, [28.6328, 77.2197]);
-    const effectiveDCoords = dCoordsOverride || destCoords || await resolveCoordinates(destTarget, [28.4744, 77.5040]);
+    // Resolve exact GPS coordinates: if an override was provided or if the place name changed, resolve fresh coordinates
+    let effectiveSCoords = sCoordsOverride;
+    if (!effectiveSCoords) {
+      if (startCoords && (!startOverride || startOverride === startLocation)) {
+        effectiveSCoords = startCoords;
+      } else {
+        effectiveSCoords = await resolveCoordinates(startTarget, [28.6328, 77.2197]);
+      }
+    }
+
+    let effectiveDCoords = dCoordsOverride;
+    if (!effectiveDCoords) {
+      if (destCoords && (!destOverride || destOverride === destinationLocation)) {
+        effectiveDCoords = destCoords;
+      } else {
+        effectiveDCoords = await resolveCoordinates(destTarget, [28.4744, 77.5040]);
+      }
+    }
 
     setStartCoords(effectiveSCoords);
     setDestCoords(effectiveDCoords);

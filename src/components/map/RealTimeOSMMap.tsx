@@ -310,7 +310,61 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
     const activeRoute = selectedRoute || candidateRoutes[0];
     const nonSelectedRoutes = candidateRoutes.filter(r => r.id !== activeRoute.id);
 
-    // 1. RENDER ALTERNATIVE ROUTES FIRST (dimmer blue with interactive click to select)
+    // Color palette mapping per corridor to guarantee high visual distinction
+    const getCorridorPalette = (r: CandidateRoute, isSelected: boolean) => {
+      const isBarred = r.clearanceStatus === 'failed';
+      const isOpt = r.isRecommended;
+
+      if (isBarred) {
+        return {
+          core: isSelected ? '#b91c1c' : '#ef4444',
+          halo: '#fca5a5',
+          pillBg: isSelected ? '#991b1b' : '#dc2626',
+          pillBorder: '#ffffff',
+          tag: 'BARRED'
+        };
+      }
+
+      if (isOpt) {
+        return {
+          core: isSelected ? '#15803d' : '#16a34a',
+          halo: '#4ade80',
+          pillBg: '#166534',
+          pillBorder: '#86efac',
+          tag: '★ OPTIMAL ROUTE'
+        };
+      }
+
+      if (r.id === 'route-a' || r.name.toLowerCase().includes('route a')) {
+        return {
+          core: isSelected ? '#c2410c' : '#ea580c',
+          halo: '#fdba74',
+          pillBg: '#9a3412',
+          pillBorder: '#fed7aa',
+          tag: 'ROUTE A'
+        };
+      }
+
+      if (r.id === 'route-b' || r.name.toLowerCase().includes('route b')) {
+        return {
+          core: isSelected ? '#1d4ed8' : '#3b82f6',
+          halo: '#93c5fd',
+          pillBg: '#1e40af',
+          pillBorder: '#bfdbfe',
+          tag: 'ROUTE B'
+        };
+      }
+
+      return {
+        core: isSelected ? '#0f766e' : '#0d9488',
+        halo: '#99f6e4',
+        pillBg: '#115e59',
+        pillBorder: '#ccfbf1',
+        tag: 'ROUTE C'
+      };
+    };
+
+    // 1. RENDER ALL ALTERNATIVE ROUTES (NO ROUTE SKIPPED)
     nonSelectedRoutes.forEach((route, idx) => {
       const latLngs = extractLatLngs(route);
       if (latLngs.length === 0) return;
@@ -318,13 +372,26 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
       latLngs.forEach(pt => bounds.extend(pt));
 
       const isBarred = route.clearanceStatus === 'failed';
-      const routeColor = isBarred ? '#f87171' : '#3b82f6';
+      const isOptimal = route.isRecommended;
+      const palette = getCorridorPalette(route, false);
+
+      // If optimal alternative, render glowing underlayer
+      if (isOptimal) {
+        L.polyline(latLngs, {
+          color: palette.halo,
+          weight: 10,
+          opacity: 0.35,
+          lineCap: 'round',
+          lineJoin: 'round',
+          interactive: false
+        }).addTo(routesGroup);
+      }
 
       // Alternative Polyline
       const polyline = L.polyline(latLngs, {
-        color: routeColor,
-        weight: 5,
-        opacity: 0.65,
+        color: palette.core,
+        weight: isOptimal ? 6 : 5,
+        opacity: isOptimal ? 0.9 : 0.75,
         dashArray: isBarred ? '8, 8' : undefined,
         lineCap: 'round',
         lineJoin: 'round',
@@ -333,10 +400,10 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
 
       // Hover emphasis
       polyline.on('mouseover', function (e) {
-        (e.target as L.Polyline).setStyle({ weight: 7, opacity: 0.95 });
+        (e.target as L.Polyline).setStyle({ weight: 7, opacity: 1.0 });
       });
       polyline.on('mouseout', function (e) {
-        (e.target as L.Polyline).setStyle({ weight: 5, opacity: 0.65 });
+        (e.target as L.Polyline).setStyle({ weight: isOptimal ? 6 : 5, opacity: isOptimal ? 0.9 : 0.75 });
       });
 
       // User click: switch active route to this candidate!
@@ -346,9 +413,10 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
 
       polyline.bindTooltip(
         `<div style="font-family: inherit; font-size: 11px; padding: 2px;">
-          <strong style="color: #1d4ed8;">${route.name}</strong><br/>
+          <strong style="color: ${palette.core};">${route.name}</strong><br/>
           <span>ETA: <b>${route.currentEtaMin} min</b> (${route.distanceKm} km)</span><br/>
-          <span style="color: #2563eb; font-size: 10px; font-weight: bold;">Click route to select</span>
+          ${isOptimal ? '<span style="color: #166534; font-weight: bold;">★ RECOMMENDED OPTIMAL CORRIDOR</span><br/>' : ''}
+          <span style="color: #2563eb; font-size: 10px; font-weight: bold;">Click to select corridor</span>
         </div>`,
         { sticky: true, direction: 'top' }
       );
@@ -356,8 +424,8 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
       polyline.addTo(routesGroup);
 
       // Midpoint ETA Pill for alternative route (Interactive Google Maps style)
-      const fraction = 0.36 + (idx * 0.18);
-      const midIdx = Math.floor(latLngs.length * Math.min(0.72, fraction));
+      const fraction = 0.32 + (idx * 0.20);
+      const midIdx = Math.floor(latLngs.length * Math.min(0.75, fraction));
       const midPoint = latLngs[midIdx] as [number, number];
 
       if (midPoint) {
@@ -365,28 +433,29 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
           className: 'route-eta-pill-alt',
           html: `
             <div style="
-              background: #1d4ed8;
+              background: ${palette.pillBg};
               color: #ffffff;
-              padding: 3px 8px;
+              padding: 3px 9px;
               border-radius: 9999px;
               font-family: inherit;
               font-size: 11px;
               font-weight: 700;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-              border: 2px solid #ffffff;
+              box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+              border: 2px solid ${palette.pillBorder};
               cursor: pointer;
               display: flex;
               align-items: center;
-              gap: 4px;
+              gap: 5px;
               white-space: nowrap;
-              transition: transform 0.15s ease, background 0.15s ease;
-            " onmouseover="this.style.transform='scale(1.08)'; this.style.background='#1e40af'" onmouseout="this.style.transform='scale(1)'; this.style.background='#1d4ed8'">
-              <span>${route.currentEtaMin} min</span>
-              <span style="font-size: 9px; opacity: 0.85; font-weight: normal;">(${route.distanceKm} km)</span>
+              transition: transform 0.15s ease, filter 0.15s ease;
+            " onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'">
+              ${isOptimal ? '<span style="color: #fef08a; font-size: 10px;">★ OPTIMAL</span>' : `<span style="opacity: 0.9; font-size: 9.5px;">${palette.tag}</span>`}
+              <span style="font-weight: 800;">${route.currentEtaMin} min</span>
+              <span style="font-size: 9px; opacity: 0.85;">(${route.distanceKm} km)</span>
             </div>
           `,
-          iconSize: [85, 24],
-          iconAnchor: [42, 12]
+          iconSize: [isOptimal ? 160 : 130, 26],
+          iconAnchor: [isOptimal ? 80 : 65, 13]
         });
 
         const pillMarker = L.marker(midPoint, { icon: altPillIcon, interactive: true });
@@ -415,12 +484,12 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
                 align-items: center;
                 justify-content: center;
                 transform: rotate(${angle}deg);
-                opacity: 0.82;
+                opacity: 0.85;
                 pointer-events: none;
                 filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
               ">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2L21 21L12 16L3 21L12 2Z" fill="#ffffff" stroke="${routeColor}" stroke-width="2.2" stroke-linejoin="round" />
+                  <path d="M12 2L21 21L12 16L3 21L12 2Z" fill="#ffffff" stroke="${palette.core}" stroke-width="2.2" stroke-linejoin="round" />
                 </svg>
               </div>
             `,
@@ -433,21 +502,21 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
       }
     });
 
-    // 2. RENDER ACTIVE / OPTIMAL SELECTED ROUTE (Prominently Highlighted with Outer Glow)
+    // 2. RENDER ACTIVE / SELECTED ROUTE (Prominently Highlighted with Outer Glow)
     if (activeRoute) {
       const activeLatLngs = extractLatLngs(activeRoute);
       if (activeLatLngs.length > 0) {
         activeLatLngs.forEach(pt => bounds.extend(pt));
 
         const isBarred = activeRoute.clearanceStatus === 'failed';
-        const haloColor = isBarred ? '#fb7185' : '#34d399';
-        const coreColor = isBarred ? '#e11d48' : '#15803d';
+        const isOpt = activeRoute.isRecommended;
+        const palette = getCorridorPalette(activeRoute, true);
 
-        // Outer glow halo polyline
+        // Outer glowing halo polyline
         L.polyline(activeLatLngs, {
-          color: haloColor,
-          weight: 12,
-          opacity: 0.35,
+          color: palette.halo,
+          weight: 14,
+          opacity: 0.40,
           lineCap: 'round',
           lineJoin: 'round',
           interactive: false
@@ -455,8 +524,8 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
 
         // Core solid polyline
         const selPolyline = L.polyline(activeLatLngs, {
-          color: coreColor,
-          weight: 6,
+          color: palette.core,
+          weight: 6.5,
           opacity: 1.0,
           lineCap: 'round',
           lineJoin: 'round',
@@ -465,7 +534,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
 
         selPolyline.bindTooltip(
           `<div style="font-family: inherit; font-size: 11px; padding: 2px;">
-            <strong style="color: ${coreColor};">${activeRoute.name} (SELECTED)</strong><br/>
+            <strong style="color: ${palette.core};">${activeRoute.name} ${isOpt ? '★ OPTIMAL (SELECTED)' : '(SELECTED)'}</strong><br/>
             <span>ETA: <b>${activeRoute.currentEtaMin} min</b> (${activeRoute.distanceKm} km)</span><br/>
             <span>Reliability: <b>${activeRoute.reliabilityScore}%</b> · Safety: <b>${activeRoute.safetyScore}%</b></span>
           </div>`,
@@ -503,7 +572,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
                   filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5));
                 ">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 2L21 21L12 16L3 21L12 2Z" fill="#ffffff" stroke="${coreColor}" stroke-width="2.5" stroke-linejoin="round" />
+                    <path d="M12 2L21 21L12 16L3 21L12 2Z" fill="#ffffff" stroke="${palette.core}" stroke-width="2.5" stroke-linejoin="round" />
                   </svg>
                 </div>
               `,
@@ -515,7 +584,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
           }
         }
 
-        // Active Route ETA Pill
+        // Active Route Prominent ETA Pill
         const activeMidIdx = Math.floor(activeLatLngs.length * 0.52);
         const activeMidPoint = activeLatLngs[activeMidIdx] as [number, number];
         if (activeMidPoint) {
@@ -523,28 +592,29 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
             className: 'route-eta-pill-active',
             html: `
               <div style="
-                background: ${isBarred ? '#be123c' : '#166534'};
+                background: ${palette.pillBg};
                 color: #ffffff;
-                padding: 4px 11px;
+                padding: 4px 12px;
                 border-radius: 9999px;
                 font-family: inherit;
                 font-size: 11.5px;
                 font-weight: 800;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.35);
-                border: 2px solid #ffffff;
+                box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+                border: 2px solid ${palette.pillBorder};
                 display: flex;
                 align-items: center;
                 gap: 6px;
                 white-space: nowrap;
               ">
                 <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 6px #4ade80;"></span>
+                ${isOpt ? '<span style="background: rgba(254,240,138,0.3); color: #fef08a; padding: 1px 6px; border-radius: 4px; font-size: 9.5px; font-weight: 800;">★ OPTIMAL</span>' : `<span style="background: rgba(255,255,255,0.2); padding: 1px 5px; border-radius: 4px; font-size: 9px; font-weight: 700;">${palette.tag}</span>`}
                 <span>${activeRoute.currentEtaMin} min</span>
                 <span style="font-size: 9.5px; opacity: 0.9;">(${activeRoute.distanceKm} km)</span>
-                <span style="background: rgba(255,255,255,0.25); padding: 1px 5px; border-radius: 4px; font-size: 9px; font-weight: 700; letter-spacing: 0.5px;">SELECTED</span>
+                <span style="background: rgba(255,255,255,0.25); padding: 1px 5px; border-radius: 4px; font-size: 9px; font-weight: 700; letter-spacing: 0.5px;">ACTIVE</span>
               </div>
             `,
-            iconSize: [140, 28],
-            iconAnchor: [70, 14]
+            iconSize: [isOpt ? 180 : 155, 30],
+            iconAnchor: [isOpt ? 90 : 77, 15]
           });
 
           L.marker(activeMidPoint, { icon: activePillIcon, interactive: false }).addTo(routesGroup);
@@ -999,6 +1069,63 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
         </div>
       )}
 
+      {/* Floating All-Corridors & Optimal Dispatch Switcher HUD */}
+      {showJourneyRoutes && candidateRoutes && candidateRoutes.length > 0 && (
+        <div className="absolute top-14 right-3 z-20 bg-white/95 backdrop-blur-md p-2.5 rounded-2xl border border-slate-200 shadow-xl max-w-[260px] animate-in fade-in duration-150">
+          <div className="flex items-center justify-between text-[10.5px] font-bold text-slate-700 pb-1.5 mb-1.5 border-b border-slate-100">
+            <span className="flex items-center space-x-1">
+              <Navigation className="w-3 h-3 text-[#166534]" />
+              <span>ALL CORRIDORS ({candidateRoutes.length})</span>
+            </span>
+            <span className="text-[9px] font-mono text-[#166534] bg-emerald-50 px-1.5 py-0.5 rounded font-bold border border-emerald-200">
+              CLICK TO SWITCH
+            </span>
+          </div>
+          <div className="space-y-1">
+            {candidateRoutes.map((r, idx) => {
+              const isSel = (selectedRoute?.id === r.id) || (!selectedRoute && idx === 0);
+              const isOpt = r.isRecommended;
+              const isBar = r.clearanceStatus === 'failed';
+
+              let dotBg = 'bg-teal-500';
+              if (isBar) dotBg = 'bg-rose-500';
+              else if (r.id === 'route-a' || r.name.toLowerCase().includes('route a')) dotBg = 'bg-amber-500';
+              else if (r.id === 'route-b' || r.name.toLowerCase().includes('route b')) dotBg = 'bg-blue-600';
+              else if (isOpt) dotBg = 'bg-emerald-600';
+
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setSelectedRoute(r)}
+                  className={`w-full text-left px-2 py-1.5 rounded-xl text-xs font-semibold flex items-center justify-between transition cursor-pointer ${
+                    isSel
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-50 hover:bg-emerald-50 text-slate-700 hover:text-emerald-950 border border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center space-x-1.5 truncate">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${dotBg}`} />
+                    <span className="truncate text-[11px] font-bold">{r.name.split('—')[0].trim()}</span>
+                    {isOpt && (
+                      <span className={`text-[8.5px] font-extrabold px-1 rounded uppercase tracking-wider ${
+                        isSel ? 'bg-emerald-400 text-slate-950' : 'bg-emerald-100 text-[#166534]'
+                      }`}>
+                        ★ OPTIMAL
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-1 shrink-0 ml-1 font-mono text-[10.5px]">
+                    <span className="font-bold">{r.currentEtaMin}m</span>
+                    {isBar && <span className="text-[9px] text-rose-300 font-extrabold">⛔</span>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {!showJourneyRoutes && (
         <div className="absolute top-14 right-3 z-10 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-slate-200 shadow-md flex items-center space-x-2 text-xs">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -1012,24 +1139,24 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
       <div ref={mapContainerRef} className="w-full h-full" style={{ minHeight: '100%' }} />
 
       {/* Map Interactive Legend */}
-      <div className="absolute bottom-3 left-3 z-10 bg-white/95 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-200 shadow-md flex flex-wrap items-center gap-3.5 text-[11px] text-slate-700 font-semibold pointer-events-auto">
+      <div className="absolute bottom-3 left-3 z-10 bg-white/95 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-200 shadow-md flex flex-wrap items-center gap-3 text-[11px] text-slate-700 font-semibold pointer-events-auto">
         {showJourneyRoutes ? (
           <>
             <div className="flex items-center space-x-1.5">
-              <span className="w-3.5 h-3.5 rounded-full bg-[#166534] border-2 border-white shadow-xs inline-block" />
-              <span>Active Route</span>
+              <span className="w-3.5 h-3.5 rounded-full bg-[#166534] border-2 border-emerald-300 shadow-xs inline-block" />
+              <span>★ Optimal Route</span>
             </div>
             <div className="flex items-center space-x-1.5">
-              <span className="w-3.5 h-3.5 rounded-full bg-[#3b82f6] border-2 border-white shadow-xs inline-block" />
-              <span>Alt Corridor (Click to select)</span>
+              <span className="w-3.5 h-3.5 rounded-full bg-[#ea580c] border-2 border-orange-200 shadow-xs inline-block" />
+              <span>Route A (Arterial)</span>
             </div>
             <div className="flex items-center space-x-1.5">
-              <span className="text-sm leading-none">💥</span>
-              <span>Accident</span>
+              <span className="w-3.5 h-3.5 rounded-full bg-[#2563eb] border-2 border-blue-200 shadow-xs inline-block" />
+              <span>Route B (Bypass)</span>
             </div>
             <div className="flex items-center space-x-1.5">
-              <span className="text-sm leading-none">🌧️</span>
-              <span>Weather Alert</span>
+              <span className="w-3.5 h-3.5 rounded-full bg-[#0d9488] border-2 border-teal-200 shadow-xs inline-block" />
+              <span>Route C (Eco)</span>
             </div>
             <div className="flex items-center space-x-1.5">
               <span className="text-sm leading-none">🚧</span>

@@ -11,7 +11,9 @@ import {
   ArrowLeftRight,
   Crosshair,
   Compass,
-  Navigation
+  Navigation,
+  Sparkles,
+  X
 } from 'lucide-react';
 import { useCityFlow } from '../../context/CityFlowContext';
 import { RoutingMode } from '../../types';
@@ -214,21 +216,55 @@ export const RoutePlanner: React.FC = () => {
     { id: 'balanced', label: 'Balanced', desc: 'Optimal multi-criteria weighting' }
   ];
 
+  const handleUseCustomTyped = (type: 'start' | 'dest') => {
+    if (type === 'start') {
+      const clean = startQuery.trim();
+      if (!clean) return;
+      setStartLocation(clean);
+      setStartCoords(null);
+      setActiveDropdown(null);
+      runRouteAnalysis(clean, destinationLocation, undefined, destCoords || undefined);
+    } else {
+      const clean = destQuery.trim();
+      if (!clean) return;
+      setDestinationLocation(clean);
+      setDestCoords(null);
+      setActiveDropdown(null);
+      runRouteAnalysis(startLocation, clean, startCoords || undefined, undefined);
+    }
+  };
+
   const handleAnalyze = () => {
     setFormError(null);
-    if (!startLocation.trim()) {
+    const sLoc = (startQuery || startLocation).trim();
+    const dLoc = (destQuery || destinationLocation).trim();
+
+    if (!sLoc) {
       setFormError('Please enter a valid start location.');
       return;
     }
-    if (!destinationLocation.trim()) {
+    if (!dLoc) {
       setFormError('Please enter a valid destination.');
       return;
     }
-    if (startLocation.trim().toLowerCase() === destinationLocation.trim().toLowerCase()) {
+    if (sLoc.toLowerCase() === dLoc.toLowerCase()) {
       setFormError('Start and destination locations cannot be identical.');
       return;
     }
-    runRouteAnalysis(startLocation, destinationLocation, startCoords || undefined, destCoords || undefined);
+
+    const sChanged = sLoc !== startLocation;
+    const dChanged = dLoc !== destinationLocation;
+
+    setStartLocation(sLoc);
+    setDestinationLocation(dLoc);
+    setActiveDropdown(null);
+
+    runRouteAnalysis(
+      sLoc,
+      dLoc,
+      sChanged ? undefined : (startCoords || undefined),
+      dChanged ? undefined : (destCoords || undefined)
+    );
   };
 
   return (
@@ -320,33 +356,74 @@ export const RoutePlanner: React.FC = () => {
               </span>
             )}
           </label>
-          <input
-            id="start-location-input"
-            type="text"
-            value={startQuery}
-            onChange={e => {
-              setStartQuery(e.target.value);
-              setStartLocation(e.target.value);
-              searchGeocode(e.target.value, 'start');
-              setActiveDropdown('start');
-            }}
-            onFocus={() => {
-              searchGeocode(startQuery, 'start');
-              setActiveDropdown('start');
-            }}
-            placeholder="Search any Delhi place, sector, or lat,lon..."
-            className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-emerald-600 focus:bg-white transition"
-          />
+          <div className="relative">
+            <input
+              id="start-location-input"
+              type="text"
+              value={startQuery}
+              onChange={e => {
+                setStartQuery(e.target.value);
+                searchGeocode(e.target.value, 'start');
+                setActiveDropdown('start');
+              }}
+              onFocus={() => {
+                searchGeocode(startQuery, 'start');
+                setActiveDropdown('start');
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  setActiveDropdown(null);
+                  handleAnalyze();
+                }
+              }}
+              placeholder="Type any Delhi area, address, sector or lat,lon..."
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-3 pr-8 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-emerald-600 focus:bg-white transition"
+            />
+            {startQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStartQuery('');
+                  setStartLocation('');
+                  setStartCoords(null);
+                  setStartSuggestions([]);
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-0.5 rounded cursor-pointer"
+                title="Clear origin input"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
-          {/* Autocomplete Dropdown with Specific Coordinates & Area Badges */}
-          {activeDropdown === 'start' && startSuggestions.length > 0 && (
-            <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-100">
+          {/* Autocomplete Dropdown with Custom Typed Option & Specific Places */}
+          {activeDropdown === 'start' && (startQuery.trim().length > 0 || startSuggestions.length > 0) && (
+            <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto divide-y divide-slate-100">
+              {/* Option 1: Direct Custom Typed Location Commitment */}
+              {startQuery.trim().length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleUseCustomTyped('start')}
+                  className="w-full text-left p-2.5 bg-emerald-50/80 hover:bg-emerald-100 text-xs font-semibold text-emerald-950 transition flex items-center justify-between border-b border-emerald-200 cursor-pointer"
+                >
+                  <div className="flex items-center space-x-2 truncate">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                    <span className="truncate">Use typed location: <b>"{startQuery}"</b></span>
+                  </div>
+                  <span className="text-[10px] bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-2 py-0.5 rounded shadow-xs shrink-0 ml-2">
+                    Lock Location ↵
+                  </span>
+                </button>
+              )}
+
+              {/* Suggestions */}
               {startSuggestions.map((sug, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => handleSelectSuggestion(sug, 'start')}
-                  className="w-full text-left p-2.5 hover:bg-emerald-50 text-xs text-slate-800 transition flex items-start space-x-2"
+                  className="w-full text-left p-2.5 hover:bg-emerald-50 text-xs text-slate-800 transition flex items-start space-x-2 cursor-pointer"
                 >
                   <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
@@ -389,33 +466,74 @@ export const RoutePlanner: React.FC = () => {
               </button>
             </div>
           </div>
-          <input
-            id="destination-location-input"
-            type="text"
-            value={destQuery}
-            onChange={e => {
-              setDestQuery(e.target.value);
-              setDestinationLocation(e.target.value);
-              searchGeocode(e.target.value, 'dest');
-              setActiveDropdown('dest');
-            }}
-            onFocus={() => {
-              searchGeocode(destQuery, 'dest');
-              setActiveDropdown('dest');
-            }}
-            placeholder="Search any destination in Delhi NCR or lat,lon..."
-            className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-emerald-600 focus:bg-white transition"
-          />
+          <div className="relative">
+            <input
+              id="destination-location-input"
+              type="text"
+              value={destQuery}
+              onChange={e => {
+                setDestQuery(e.target.value);
+                searchGeocode(e.target.value, 'dest');
+                setActiveDropdown('dest');
+              }}
+              onFocus={() => {
+                searchGeocode(destQuery, 'dest');
+                setActiveDropdown('dest');
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  setActiveDropdown(null);
+                  handleAnalyze();
+                }
+              }}
+              placeholder="Type any destination in Delhi NCR or lat,lon..."
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-3 pr-8 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-emerald-600 focus:bg-white transition"
+            />
+            {destQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDestQuery('');
+                  setDestinationLocation('');
+                  setDestCoords(null);
+                  setDestSuggestions([]);
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-0.5 rounded cursor-pointer"
+                title="Clear destination input"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
-          {/* Autocomplete Dropdown */}
-          {activeDropdown === 'dest' && destSuggestions.length > 0 && (
-            <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-100">
+          {/* Autocomplete Dropdown with Custom Typed Option & Specific Places */}
+          {activeDropdown === 'dest' && (destQuery.trim().length > 0 || destSuggestions.length > 0) && (
+            <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto divide-y divide-slate-100">
+              {/* Option 1: Direct Custom Typed Location Commitment */}
+              {destQuery.trim().length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleUseCustomTyped('dest')}
+                  className="w-full text-left p-2.5 bg-emerald-50/80 hover:bg-emerald-100 text-xs font-semibold text-emerald-950 transition flex items-center justify-between border-b border-emerald-200 cursor-pointer"
+                >
+                  <div className="flex items-center space-x-2 truncate">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                    <span className="truncate">Use typed destination: <b>"{destQuery}"</b></span>
+                  </div>
+                  <span className="text-[10px] bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-2 py-0.5 rounded shadow-xs shrink-0 ml-2">
+                    Lock Location ↵
+                  </span>
+                </button>
+              )}
+
+              {/* Suggestions */}
               {destSuggestions.map((sug, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => handleSelectSuggestion(sug, 'dest')}
-                  className="w-full text-left p-2.5 hover:bg-emerald-50 text-xs text-slate-800 transition flex items-start space-x-2"
+                  className="w-full text-left p-2.5 hover:bg-emerald-50 text-xs text-slate-800 transition flex items-start space-x-2 cursor-pointer"
                 >
                   <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">

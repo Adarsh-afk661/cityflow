@@ -158,11 +158,24 @@ export const RouteCard: React.FC<RouteCardProps> = ({ route, onCompare }) => {
             </div>
           </div>
         ) : route.co2SavingsKg > 0 ? (
-          <div className="p-2.5 mb-4 rounded-xl bg-emerald-50 border border-emerald-200 text-[#166534] text-xs font-medium flex items-center space-x-2">
+          <div className="p-2.5 mb-3 rounded-xl bg-emerald-50 border border-emerald-200 text-[#166534] text-xs font-medium flex items-center space-x-2">
             <TrendingDown className="w-4 h-4 shrink-0" />
             <span><strong>{route.co2SavingsKg} kg CO₂ saved</strong> compared with fastest corridor baseline.</span>
           </div>
         ) : null}
+
+        {/* Hybrid Spatial-Graph Indicator */}
+        {route.circuityRatio && (
+          <div className="mb-3 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/90 text-[10px] font-mono text-slate-700 flex flex-wrap items-center justify-between gap-1">
+            <span className="font-bold text-[#166534] flex items-center space-x-1">
+              <span>🌐</span>
+              <span>HYBRID SPATIAL-GRAPH</span>
+            </span>
+            <span>
+              Haversine: <strong>{route.haversineDirectKm || '—'} km</strong> · Road: <strong>{route.distanceKm} km</strong> · Circuity: <strong className="text-emerald-700">{route.circuityRatio}x</strong>
+            </span>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex items-center justify-between pt-3 border-t border-slate-200/80">

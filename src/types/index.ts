@@ -77,6 +77,9 @@ export interface CandidateRoute {
   infrastructureEncountered: string[];
   tags: string[];
   realCoordinates?: [number, number][];
+  haversineDirectKm?: number;
+  circuityRatio?: number;
+  routingMethod?: string;
 }
 
 export interface CityZone {

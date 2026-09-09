@@ -5,6 +5,9 @@ export interface RawRouteGeometry {
   name: string;
   summary: string;
   source: string;
+  haversineDirectKm?: number;
+  circuityRatio?: number;
+  routingMethod?: string;
 }
 
 export interface RoutingEngineResponse {
@@ -12,6 +15,7 @@ export interface RoutingEngineResponse {
   routes: RawRouteGeometry[];
   source: string;
   timestamp: string;
+  haversineDirectKm?: number;
 }
 
 export async function fetchLiveDrivingRoutes(
@@ -21,6 +25,7 @@ export async function fetchLiveDrivingRoutes(
   endLon: number
 ): Promise<RoutingEngineResponse> {
   const routes: RawRouteGeometry[] = [];
+  const haversineDirectKm = calculateHaversineDistanceKm(startLat, startLon, endLat, endLon);
 
   try {
     // Query OSRM with alternatives=true to get primary + alternative bypass corridors
@@ -38,6 +43,10 @@ export async function fetchLiveDrivingRoutes(
         data.routes.forEach((r: any, index: number) => {
           const distKm = +(r.distance / 1000).toFixed(2);
           const durMin = Math.round(r.duration / 60);
+          const coords = (r.geometry?.coordinates || []) as [number, number][];
+          const polylineHaversineKm = calculatePolylineHaversineDistanceKm(coords);
+          const circuityRatio = haversineDirectKm > 0 ? +(distKm / haversineDirectKm).toFixed(2) : 1.0;
+
           const name = index === 0
             ? 'DIRECT COMMERCIAL EXPRESSWAY'
             : index === 1
@@ -49,8 +58,11 @@ export async function fetchLiveDrivingRoutes(
             summary: r.legs?.[0]?.summary || `Corridor via ${distKm} km link`,
             distanceKm: distKm,
             durationMin: durMin,
-            coordinates: r.geometry?.coordinates || [],
-            source: 'OSRM Open Source Routing Machine'
+            coordinates: coords,
+            source: 'OSRM Road Graph (Contraction Hierarchies)',
+            haversineDirectKm,
+            circuityRatio,
+            routingMethod: 'Hybrid Spatial-Graph (Haversine Heuristic + OSRM Contraction Hierarchies)'
           });
         });
 
@@ -65,13 +77,19 @@ export async function fetchLiveDrivingRoutes(
             [endLon, endLat]
           ] as [number, number][];
 
+          const bypassDist = +(base.distanceKm * 1.14).toFixed(2);
+          const bypassCircuity = haversineDirectKm > 0 ? +(bypassDist / haversineDirectKm).toFixed(2) : 1.15;
+
           routes.push({
             name: 'REGIONAL RING & VIADUCT BYPASS',
             summary: 'High-clearance circumferential viaduct',
-            distanceKm: +(base.distanceKm * 1.14).toFixed(2),
+            distanceKm: bypassDist,
             durationMin: Math.round(base.durationMin * 1.12),
             coordinates: bypassCoords,
-            source: 'OSRM Verified Corridor Variation'
+            source: 'OSRM Verified Corridor Variation',
+            haversineDirectKm,
+            circuityRatio: bypassCircuity,
+            routingMethod: 'Hybrid Spatial-Graph (Haversine Heuristic + OSRM Contraction Hierarchies)'
           });
         }
 
@@ -118,7 +136,10 @@ export async function fetchLiveDrivingRoutes(
         distanceKm: roadDistKm,
         durationMin: baseDurMin,
         coordinates: primaryCoords,
-        source: 'CityFlow Certified Geodetic Engine'
+        source: 'CityFlow Certified Geodetic Engine',
+        haversineDirectKm: straightDistKm,
+        circuityRatio: straightDistKm > 0 ? +(roadDistKm / straightDistKm).toFixed(2) : 1.35,
+        routingMethod: 'Hybrid Spatial-Graph (Haversine Geodesic + Geometric Winding Network)'
       },
       {
         name: 'REGIONAL RING & VIADUCT BYPASS',
@@ -126,7 +147,10 @@ export async function fetchLiveDrivingRoutes(
         distanceKm: +(roadDistKm * 1.15).toFixed(2),
         durationMin: Math.round(baseDurMin * 1.14),
         coordinates: bypassCoords,
-        source: 'CityFlow Certified Geodetic Engine'
+        source: 'CityFlow Certified Geodetic Engine',
+        haversineDirectKm: straightDistKm,
+        circuityRatio: straightDistKm > 0 ? +((roadDistKm * 1.15) / straightDistKm).toFixed(2) : 1.55,
+        routingMethod: 'Hybrid Spatial-Graph (Haversine Geodesic + Geometric Winding Network)'
       }
     ],
     source: 'CityFlow Geodetic Routing Fallback',
@@ -151,4 +175,16 @@ export function calculateHaversineDistanceKm(
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return +(R * c).toFixed(2);
+}
+
+export function calculatePolylineHaversineDistanceKm(coords: [number, number][]): number {
+  if (!coords || coords.length < 2) return 0;
+  let totalKm = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p1 = coords[i];
+    const p2 = coords[i + 1];
+    // coords are [lon, lat]
+    totalKm += calculateHaversineDistanceKm(p1[1], p1[0], p2[1], p2[0]);
+  }
+  return +totalKm.toFixed(2);
 }

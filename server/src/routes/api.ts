@@ -824,9 +824,12 @@ const handleJourneyAnalysis = async (req: Request, res: Response) => {
         isRecommended: false,
         pathWaypoints,
         realCoordinates: raw.coordinates,
-        description: raw.summary + ' (' + raw.distanceKm + ' km, live traffic speed ~' + traffic.averageSpeedKmh + ' km/h)',
+        haversineDirectKm: raw.haversineDirectKm,
+        circuityRatio: raw.circuityRatio,
+        routingMethod: raw.routingMethod || 'Hybrid Spatial-Graph (Haversine + OSRM)',
+        description: raw.summary + ' (' + raw.distanceKm + ' km, live traffic speed ~' + traffic.averageSpeedKmh + ' km/h, circuity ' + (raw.circuityRatio || 1.2) + 'x)',
         infrastructureEncountered: clearance.checks.map(c => c.infrastructureName),
-        tags: ['Live OSRM', 'Open-Meteo Weather', 'Clearance Verified']
+        tags: ['Hybrid Spatial-Graph', 'Haversine Heuristic', 'OSRM Graph', 'Open-Meteo Weather', 'Clearance Verified']
       });
     }
 

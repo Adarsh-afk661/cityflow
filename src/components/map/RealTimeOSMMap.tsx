@@ -1,8 +1,65 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { Search, Loader2, Navigation, MapPin } from 'lucide-react';
+import {
+  Search,
+  Loader2,
+  Navigation,
+  Navigation2,
+  MapPin,
+  Clock,
+  ArrowRight,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
 import { useCityFlow } from '../../context/CityFlowContext';
 import { CandidateRoute } from '../../types';
+
+// Helper to calculate geographic bearing angle (0-360 degrees) between two points
+const getBearingAngle = (p1: [number, number], p2: [number, number]): number => {
+  const lat1 = (p1[0] * Math.PI) / 180;
+  const lon1 = (p1[1] * Math.PI) / 180;
+  const lat2 = (p2[0] * Math.PI) / 180;
+  const lon2 = (p2[1] * Math.PI) / 180;
+  const dLon = lon2 - lon1;
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+  const brng = (Math.atan2(y, x) * 180) / Math.PI;
+  return (brng + 360) % 360;
+};
+
+// Helper to compute realistic Pickup and Drop-off times from departure settings & ETA
+const calculateJourneyTimes = (departureStr: string = 'Now', durationMins: number = 30) => {
+  const match = departureStr ? departureStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i) : null;
+  let startHour: number;
+  let startMin: number;
+
+  if (match) {
+    let h = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10);
+    const period = match[3].toUpperCase();
+    if (period === 'PM' && h < 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
+    startHour = h;
+    startMin = m;
+  } else {
+    const now = new Date();
+    startHour = now.getHours();
+    startMin = now.getMinutes();
+  }
+
+  const pickupDate = new Date();
+  pickupDate.setHours(startHour, startMin, 0, 0);
+
+  const dropoffDate = new Date(pickupDate.getTime() + durationMins * 60 * 1000);
+
+  const fmt = (d: Date) =>
+    d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+
+  return {
+    pickupTime: fmt(pickupDate),
+    dropoffTime: fmt(dropoffDate),
+  };
+};
 
 interface RealTimeOSMMapProps {
   heightClass?: string;
@@ -25,6 +82,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
     selectedVehicle,
     startLocation,
     destinationLocation,
+    departureTime,
     fleet,
     cityZones
   } = useCityFlow();
@@ -32,7 +90,14 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMin: number; name: string } | null>(null);
+  const [routeInfo, setRouteInfo] = useState<{
+    distanceKm: number;
+    durationMin: number;
+    name: string;
+    pickupTime: string;
+    dropoffTime: string;
+  } | null>(null);
+  const [navCardExpanded, setNavCardExpanded] = useState(true);
 
   // Initialize Leaflet map instance once
   useEffect(() => {
@@ -310,6 +375,44 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
         pillMarker.on('click', () => setSelectedRoute(route));
         pillMarker.addTo(routesGroup);
       }
+
+      // Direction Arrows along Alternative Route (Google Maps style)
+      if (latLngs.length >= 2) {
+        const altStep = Math.max(2, Math.floor((latLngs.length - 1) / 5));
+        for (let i = 1; i < latLngs.length - 1; i += altStep) {
+          const p1 = latLngs[i] as [number, number];
+          const p2 = latLngs[Math.min(i + 1, latLngs.length - 1)] as [number, number];
+          if (Math.abs(p1[0] - p2[0]) < 0.00005 && Math.abs(p1[1] - p2[1]) < 0.00005) continue;
+
+          const angle = getBearingAngle(p1, p2);
+          const midPoint: [number, number] = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+
+          const altArrowIcon = L.divIcon({
+            className: 'route-direction-arrow-alt',
+            html: `
+              <div style="
+                width: 18px;
+                height: 18px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transform: rotate(${angle}deg);
+                opacity: 0.82;
+                pointer-events: none;
+                filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+              ">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L21 21L12 16L3 21L12 2Z" fill="#ffffff" stroke="${routeColor}" stroke-width="2.2" stroke-linejoin="round" />
+                </svg>
+              </div>
+            `,
+            iconSize: [18, 18],
+            iconAnchor: [9, 9]
+          });
+
+          L.marker(midPoint, { icon: altArrowIcon, interactive: false }).addTo(routesGroup);
+        }
+      }
     });
 
     // 2. RENDER ACTIVE / OPTIMAL SELECTED ROUTE (Prominently Highlighted with Outer Glow)
@@ -351,6 +454,49 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
           { sticky: true, direction: 'top' }
         );
 
+        // Google Maps Navigation Direction Arrows along active route
+        if (activeLatLngs.length >= 2) {
+          const numArrows = Math.min(14, Math.max(5, Math.floor(activeLatLngs.length / 3)));
+          const step = Math.max(1, Math.floor((activeLatLngs.length - 1) / numArrows));
+
+          for (let i = 0; i < activeLatLngs.length - 1; i += step) {
+            const p1 = activeLatLngs[i] as [number, number];
+            const p2 = activeLatLngs[Math.min(i + 1, activeLatLngs.length - 1)] as [number, number];
+
+            if (Math.abs(p1[0] - p2[0]) < 0.00005 && Math.abs(p1[1] - p2[1]) < 0.00005) continue;
+
+            const angle = getBearingAngle(p1, p2);
+            const midPoint: [number, number] = [
+              (p1[0] + p2[0]) / 2,
+              (p1[1] + p2[1]) / 2
+            ];
+
+            const arrowIcon = L.divIcon({
+              className: 'route-direction-arrow-active',
+              html: `
+                <div style="
+                  width: 22px;
+                  height: 22px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  transform: rotate(${angle}deg);
+                  pointer-events: none;
+                  filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5));
+                ">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2L21 21L12 16L3 21L12 2Z" fill="#ffffff" stroke="${coreColor}" stroke-width="2.5" stroke-linejoin="round" />
+                  </svg>
+                </div>
+              `,
+              iconSize: [22, 22],
+              iconAnchor: [11, 11]
+            });
+
+            L.marker(midPoint, { icon: arrowIcon, interactive: false }).addTo(routesGroup);
+          }
+        }
+
         // Active Route ETA Pill
         const activeMidIdx = Math.floor(activeLatLngs.length * 0.52);
         const activeMidPoint = activeLatLngs[activeMidIdx] as [number, number];
@@ -386,10 +532,13 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
           L.marker(activeMidPoint, { icon: activePillIcon, interactive: false }).addTo(routesGroup);
         }
 
+        const calculatedTimes = calculateJourneyTimes(departureTime, activeRoute.currentEtaMin);
         setRouteInfo({
           distanceKm: activeRoute.distanceKm,
           durationMin: activeRoute.currentEtaMin,
-          name: activeRoute.name
+          name: activeRoute.name,
+          pickupTime: calculatedTimes.pickupTime,
+          dropoffTime: calculatedTimes.dropoffTime
         });
       }
     }
@@ -401,6 +550,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
     if (primaryLatLngs.length > 1) {
       const originPt = primaryLatLngs[0] as [number, number];
       const destPt = primaryLatLngs[primaryLatLngs.length - 1] as [number, number];
+      const pinTimes = calculateJourneyTimes(departureTime, primaryRoute.currentEtaMin);
 
       // Origin Pin (A)
       const originIcon = L.divIcon({
@@ -419,13 +569,20 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
 
       L.marker(originPt, { icon: originIcon })
         .bindPopup(`
-          <div style="font-family: inherit; min-width: 190px; padding: 2px;">
-            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;">
-              <span style="display:inline-block; width: 10px; height: 10px; border-radius: 50%; background: #166534;"></span>
-              <strong style="color: #166534; font-size: 13px;">ORIGIN (START)</strong>
+          <div style="font-family: inherit; min-width: 220px; padding: 4px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid #bbf7d0; padding-bottom: 4px;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="display:inline-block; width: 10px; height: 10px; border-radius: 50%; background: #166534;"></span>
+                <strong style="color: #166534; font-size: 12px; letter-spacing: 0.5px;">PICKUP LOCATION (START)</strong>
+              </div>
+              <span style="font-size: 9px; font-weight: 800; background: #dcfce7; color: #166534; padding: 1px 6px; border-radius: 4px;">STOP A</span>
             </div>
-            <div style="font-size: 11.5px; color: #1e293b; font-weight: 700;">${startLocation || 'Delhi'}</div>
-            <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Fleet Logistics Hub · Staging Bay #4</div>
+            <div style="font-size: 12.5px; color: #0f172a; font-weight: 800; margin-bottom: 5px;">${startLocation || 'Delhi Hub'}</div>
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 5px 8px; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-size: 11px; color: #166534; font-weight: 600;">🕒 Pickup Time:</span>
+              <span style="font-size: 12px; color: #166534; font-weight: 800;">${pinTimes.pickupTime}</span>
+            </div>
+            <div style="font-size: 10px; color: #64748b;">Journey commences towards destination.</div>
           </div>
         `)
         .addTo(markersGroup);
@@ -447,13 +604,20 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
 
       L.marker(destPt, { icon: destIcon })
         .bindPopup(`
-          <div style="font-family: inherit; min-width: 190px; padding: 2px;">
-            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;">
-              <span style="display:inline-block; width: 10px; height: 10px; border-radius: 50%; background: #b91c1c;"></span>
-              <strong style="color: #b91c1c; font-size: 13px;">DESTINATION (TARGET)</strong>
+          <div style="font-family: inherit; min-width: 220px; padding: 4px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid #fecaca; padding-bottom: 4px;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="display:inline-block; width: 10px; height: 10px; border-radius: 50%; background: #b91c1c;"></span>
+                <strong style="color: #b91c1c; font-size: 12px; letter-spacing: 0.5px;">DROP-OFF LOCATION (DEST)</strong>
+              </div>
+              <span style="font-size: 9px; font-weight: 800; background: #fee2e2; color: #b91c1c; padding: 1px 6px; border-radius: 4px;">STOP B</span>
             </div>
-            <div style="font-size: 11.5px; color: #1e293b; font-weight: 700;">${destinationLocation || 'Greater Noida'}</div>
-            <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Central Distribution Point</div>
+            <div style="font-size: 12.5px; color: #0f172a; font-weight: 800; margin-bottom: 5px;">${destinationLocation || 'Greater Noida Hub'}</div>
+            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 5px 8px; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-size: 11px; color: #b91c1c; font-weight: 600;">🏁 Drop-off Time:</span>
+              <span style="font-size: 12px; color: #b91c1c; font-weight: 800;">${pinTimes.dropoffTime}</span>
+            </div>
+            <div style="font-size: 10px; color: #64748b;">Transit Duration: <strong>${primaryRoute.currentEtaMin} min</strong> (${primaryRoute.distanceKm} km)</div>
           </div>
         `)
         .addTo(markersGroup);
@@ -589,7 +753,7 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
         maxZoom: 14
       });
     }
-  }, [showJourneyRoutes, candidateRoutes, selectedRoute, selectedVehicle, startLocation, destinationLocation, fleet, cityZones, setSelectedRoute]);
+  }, [showJourneyRoutes, candidateRoutes, selectedRoute, selectedVehicle, startLocation, destinationLocation, departureTime, fleet, cityZones, setSelectedRoute]);
 
   // Real-time geocoding search handler
   const handleSearch = async (e?: React.FormEvent) => {
@@ -670,21 +834,90 @@ export const RealTimeOSMMap: React.FC<RealTimeOSMMapProps> = ({
         )}
       </div>
 
-      {/* Live Route Telemetry HUD Pill */}
+      {/* Google Maps Style Journey Navigation & Timing Card */}
       {showJourneyRoutes && routeInfo && (
-        <div className="absolute top-14 right-3 z-10 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-slate-200 shadow-md flex items-center space-x-3 text-xs">
-          <div className="flex items-center space-x-1.5">
-            <Navigation className="w-3.5 h-3.5 text-[#166534]" />
-            <span className="font-bold text-slate-900">{routeInfo.distanceKm} km</span>
+        <div className="absolute top-3 right-3 z-20 w-80 sm:w-96 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-2xl overflow-hidden transition-all duration-200 pointer-events-auto">
+          {/* Card Header: Duration & Live Traffic Badge */}
+          <div className="bg-gradient-to-r from-[#166534] via-[#15803d] to-[#166534] px-4 py-3 text-white flex items-center justify-between shadow-xs">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur-xs border border-white/20 shadow-xs">
+                <Navigation2 className="w-4 h-4 text-white fill-white" />
+              </div>
+              <div>
+                <div className="flex items-baseline space-x-2">
+                  <span className="text-xl font-black tracking-tight">{routeInfo.durationMin} min</span>
+                  <span className="text-xs font-semibold text-emerald-100">({routeInfo.distanceKm} km)</span>
+                </div>
+                <div className="text-[11px] text-emerald-100 font-medium flex items-center space-x-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse inline-block"></span>
+                  <span>Fastest route · Typical traffic</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setNavCardExpanded(!navCardExpanded)}
+              className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition flex items-center justify-center cursor-pointer"
+              title={navCardExpanded ? "Minimize navigation card" : "Expand navigation card"}
+            >
+              {navCardExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
           </div>
-          <span className="text-slate-300">|</span>
-          <div className="text-slate-700 font-bold">
-            <span>{routeInfo.durationMin} min ETA</span>
-          </div>
-          <span className="text-slate-300">|</span>
-          <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-            GOOGLE-STYLE MULTI-ROUTE
-          </span>
+
+          {/* Expanded Journey Details (From -> To & Pick/Drop Timings) */}
+          {navCardExpanded && (
+            <div className="p-3.5 space-y-3 text-xs bg-white/95">
+              {/* Route Path (Pickup & Drop-off Timings) */}
+              <div className="relative pl-6 space-y-3 before:absolute before:left-2.5 before:top-2.5 before:bottom-2.5 before:w-0.5 before:bg-slate-200">
+                {/* Pickup / Origin */}
+                <div className="relative">
+                  <span className="absolute -left-6 top-0.5 w-3.5 h-3.5 rounded-full bg-[#166534] border-2 border-white ring-2 ring-emerald-200 flex items-center justify-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-bold text-slate-900 text-[12px] truncate max-w-[170px]" title={startLocation || 'Pickup Location'}>
+                      {startLocation || 'Delhi Hub'}
+                    </div>
+                    <div className="shrink-0 font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 font-mono text-[11px] flex items-center space-x-1">
+                      <Clock className="w-3 h-3 text-emerald-600" />
+                      <span>Pickup: {routeInfo.pickupTime}</span>
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-medium">Origin · Start of Journey</div>
+                </div>
+
+                {/* Drop-off / Destination */}
+                <div className="relative">
+                  <span className="absolute -left-6 top-0.5 w-3.5 h-3.5 rounded-full bg-[#b91c1c] border-2 border-white ring-2 ring-red-200 flex items-center justify-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-bold text-slate-900 text-[12px] truncate max-w-[170px]" title={destinationLocation || 'Drop-off Destination'}>
+                      {destinationLocation || 'Greater Noida Hub'}
+                    </div>
+                    <div className="shrink-0 font-bold text-rose-800 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 font-mono text-[11px] flex items-center space-x-1">
+                      <Clock className="w-3 h-3 text-rose-600" />
+                      <span>Drop: {routeInfo.dropoffTime}</span>
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-medium">Destination · Expected Arrival</div>
+                </div>
+              </div>
+
+              {/* Bottom Quick Indicator */}
+              <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
+                <span className="font-semibold text-slate-700 truncate max-w-[190px] flex items-center space-x-1">
+                  <span>Corridor:</span>
+                  <strong className="text-slate-900 truncate">{routeInfo.name}</strong>
+                </span>
+                <span className="inline-flex items-center space-x-1 text-emerald-700 font-bold text-[10px] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                  <ArrowRight className="w-3 h-3 text-emerald-600" />
+                  <span>Direction Active</span>
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

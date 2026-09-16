@@ -1,4 +1,5 @@
 import {
+  Home,
   LayoutDashboard,
   ShieldAlert,
   Truck,
@@ -31,7 +32,7 @@ export const Sidebar: React.FC = () => {
   const unreadAlerts = alerts.filter(a => !a.acknowledged).length;
 
   const navItems: { id: PageName; label: string; icon: React.ReactNode; badge?: number }[] = [
-    { id: 'landing', label: 'Product Overview', icon: <Globe className="w-4 h-4" /> },
+    { id: 'landing', label: 'Home', icon: <Home className="w-4 h-4" /> },
     { id: 'dashboard', label: 'Command Center', icon: <LayoutDashboard className="w-4 h-4" /> },
     { id: 'routeshield', label: 'RouteShield', icon: <ShieldAlert className="w-4 h-4" /> },
     { id: 'fleet', label: 'Fleet Operations', icon: <Truck className="w-4 h-4" /> },

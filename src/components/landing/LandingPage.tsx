@@ -33,19 +33,36 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) 
             <span style={{ fontSize: '10px', background: '#ecfdf5', color: '#166534', padding: '1px 6px', borderRadius: '4px', border: '1px solid #bbf7d0', fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>PRO</span>
           </div>
           <div className="nav-links">
+            <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} style={{ fontWeight: 700, color: 'var(--city-green)' }}>Home</button>
             <button onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Platform</button>
             <button onClick={() => handleLaunchPlatform('routeshield')}>RouteShield</button>
             <button onClick={() => document.getElementById('stats')?.scrollIntoView({ behavior: 'smooth' })}>Results</button>
             <button onClick={() => handleLaunchPlatform('fleet')}>Fleet Ops</button>
           </div>
           <div className="nav-cta">
-            <button className="btn ghost" onClick={() => handleLaunchPlatform('login')}>Sign In</button>
-            <button className="btn primary" onClick={() => handleLaunchPlatform('routeshield')}>
-              <span>Launch RouteShield</span>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M5 12h14M13 6l6 6-6 6"/>
-              </svg>
-            </button>
+            {user ? (
+              <>
+                <button className="btn ghost" onClick={() => onNavigatePlatform('dashboard')}>
+                  Command Center
+                </button>
+                <button className="btn primary" onClick={() => onNavigatePlatform('routeshield')}>
+                  <span>Launch RouteShield</span>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M5 12h14M13 6l6 6-6 6"/>
+                  </svg>
+                </button>
+              </>
+            ) : (
+              <>
+                <button className="btn ghost" onClick={() => handleLaunchPlatform('login')}>Sign In</button>
+                <button className="btn primary" onClick={() => handleLaunchPlatform('routeshield')}>
+                  <span>Launch RouteShield</span>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M5 12h14M13 6l6 6-6 6"/>
+                  </svg>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </nav>

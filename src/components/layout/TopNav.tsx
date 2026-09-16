@@ -12,13 +12,18 @@ import {
   LogIn,
   LogOut,
   UserCheck,
-  Menu
+  Menu,
+  ArrowLeft,
+  Home
 } from 'lucide-react';
 import { useCityFlow } from '../../context/CityFlowContext';
 import { DataStatusIndicator } from '../common/DataStatusIndicator';
 
 export const TopNav: React.FC = () => {
   const {
+    activePage,
+    goBack,
+    canGoBack,
     selectedCity,
     setSelectedCity,
     liveTrafficEnabled,
@@ -125,14 +130,32 @@ export const TopNav: React.FC = () => {
 
       {/* Action Controls */}
       <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
-        {/* Toggle back to Product Landing Overview */}
-        <button
-          onClick={() => setActivePage('landing')}
-          className="hidden xl:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-600 hover:text-slate-900 transition"
-        >
-          <Globe className="w-3.5 h-3.5 text-emerald-700" />
-          <span>Product Overview</span>
-        </button>
+        {/* Universal In-App Back & Home Navigation */}
+        <div className="flex items-center space-x-1 sm:space-x-1.5">
+          <button
+            id="topnav-back-btn"
+            onClick={goBack}
+            title="Go Back to Previous Screen"
+            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-semibold transition cursor-pointer shadow-2xs"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-slate-600" />
+            <span className="hidden xs:inline">Back</span>
+          </button>
+
+          <button
+            id="topnav-home-btn"
+            onClick={() => setActivePage('landing')}
+            title="Return to Home Overview"
+            className={`flex items-center space-x-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer shadow-2xs border ${
+              activePage === 'landing'
+                ? 'bg-emerald-50 text-[#166534] border-emerald-300 font-bold'
+                : 'bg-white hover:bg-slate-50 text-slate-700 hover:text-[#166534] border-slate-200'
+            }`}
+          >
+            <Home className="w-3.5 h-3.5 text-emerald-700" />
+            <span>Home</span>
+          </button>
+        </div>
 
         {/* Real-time Data Freshness & Provider Status */}
         <div className="hidden xl:block">

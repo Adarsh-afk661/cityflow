@@ -26,9 +26,13 @@ import { resolveLocationCoordinates } from '../services/universalGeocoder';
 
 export type PageName = 'landing' | 'login' | 'dashboard' | 'routeshield' | 'fleet' | 'whatif' | 'analytics' | 'alerts' | 'settings';
 
+export const VALID_PAGES: PageName[] = ['landing', 'login', 'dashboard', 'routeshield', 'fleet', 'whatif', 'analytics', 'alerts', 'settings'];
+
 interface CityFlowContextType {
   activePage: PageName;
-  setActivePage: (page: PageName) => void;
+  setActivePage: (page: PageName, pushState?: boolean) => void;
+  goBack: () => void;
+  canGoBack: boolean;
   selectedCity: string;
   setSelectedCity: (city: string) => void;
 
@@ -118,10 +122,83 @@ interface CityFlowContextType {
   resetAllData: () => void;
 }
 
+const getInitialPage = (): PageName => {
+  if (typeof window !== 'undefined') {
+    const hash = window.location.hash.replace('#', '').toLowerCase();
+    if (VALID_PAGES.includes(hash as PageName)) {
+      return hash as PageName;
+    }
+  }
+  return 'landing';
+};
+
 const CityFlowContext = createContext<CityFlowContextType | undefined>(undefined);
 
 export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [activePage, setActivePage] = useState<PageName>('landing');
+  const [activePage, setActivePageState] = useState<PageName>(getInitialPage);
+  const [historyStack, setHistoryStack] = useState<PageName[]>([getInitialPage()]);
+
+  const setActivePage = (page: PageName, pushState: boolean = true) => {
+    setActivePageState(page);
+    if (pushState && typeof window !== 'undefined') {
+      if (window.location.hash !== `#${page}`) {
+        window.history.pushState({ page }, '', `#${page}`);
+      }
+      setHistoryStack(prev => [...prev, page]);
+    }
+  };
+
+  const goBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
+    } else if (historyStack.length > 1) {
+      const nextStack = [...historyStack];
+      nextStack.pop();
+      const prevPage = nextStack[nextStack.length - 1] || 'landing';
+      setHistoryStack(nextStack);
+      setActivePageState(prevPage);
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({ page: prevPage }, '', `#${prevPage}`);
+      }
+    } else {
+      setActivePage('landing');
+    }
+  };
+
+  const canGoBack = historyStack.length > 1 || (typeof window !== 'undefined' && window.history.length > 1);
+
+  // Sync browser popstate (native Back/Forward arrow clicks)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const currentHash = window.location.hash.replace('#', '').toLowerCase();
+    const initPage = VALID_PAGES.includes(currentHash as PageName) ? (currentHash as PageName) : 'landing';
+    window.history.replaceState({ page: initPage }, '', `#${initPage}`);
+
+    const handlePopState = (e: PopStateEvent) => {
+      let targetPage: PageName = 'landing';
+      if (e.state && e.state.page && VALID_PAGES.includes(e.state.page)) {
+        targetPage = e.state.page;
+      } else {
+        const hashPage = window.location.hash.replace('#', '').toLowerCase() as PageName;
+        if (VALID_PAGES.includes(hashPage)) {
+          targetPage = hashPage;
+        }
+      }
+      setActivePageState(targetPage);
+      setHistoryStack(prev => {
+        const idx = prev.lastIndexOf(targetPage);
+        if (idx !== -1) {
+          return prev.slice(0, idx + 1);
+        }
+        return [...prev, targetPage];
+      });
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const [selectedCity, setSelectedCity] = useState<string>('Delhi — Greater Noida Corridor');
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
@@ -623,6 +700,8 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
       value={{
         activePage,
         setActivePage,
+        goBack,
+        canGoBack,
         selectedCity,
         setSelectedCity,
         user,

@@ -13,7 +13,8 @@ import {
   AlertTriangle,
   Building2,
   ArrowLeft,
-  Users
+  Users,
+  Home
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useCityFlow } from '../context/CityFlowContext';
@@ -64,7 +65,7 @@ const PRESET_ROLES: PresetRole[] = [
 ];
 
 export const LoginPage: React.FC = () => {
-  const { loginAs, setActivePage } = useCityFlow();
+  const { loginAs, setActivePage, goBack } = useCityFlow();
 
   const [activeTab, setActiveTab] = useState<'otp' | 'roles' | 'sso'>('otp');
   const [step, setStep] = useState<'email' | 'otp' | 'success'>('email');
@@ -302,13 +303,22 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center space-x-2 sm:space-x-3">
+        <div className="flex items-center space-x-2">
           <button
-            onClick={() => setActivePage('landing')}
+            onClick={goBack}
             className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-semibold transition cursor-pointer shadow-xs"
+            title="Go Back"
           >
             <ArrowLeft className="w-3.5 h-3.5 text-slate-500" />
-            <span className="hidden xs:inline">Product</span> Overview
+            <span>Back</span>
+          </button>
+          <button
+            onClick={() => setActivePage('landing')}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#166534] border border-emerald-200 text-xs font-semibold transition cursor-pointer shadow-xs"
+            title="Return to Home Page"
+          >
+            <Home className="w-3.5 h-3.5 text-[#166534]" />
+            <span>Home</span>
           </button>
         </div>
       </header>
@@ -866,9 +876,9 @@ export const LoginPage: React.FC = () => {
         <div className="flex items-center space-x-3 sm:space-x-4">
           <button
             onClick={() => setActivePage('landing')}
-            className="hover:text-slate-800 transition cursor-pointer"
+            className="hover:text-[#166534] font-medium transition cursor-pointer"
           >
-            Platform Overview
+            Home Page
           </button>
           <span>•</span>
           <span className="text-emerald-700 font-medium">Clearance Verified</span>

@@ -36,6 +36,7 @@ export const TopNav: React.FC = () => {
   } = useCityFlow();
 
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const cities = [
@@ -187,15 +188,66 @@ export const TopNav: React.FC = () => {
           <span>LAUNCH DEMO</span>
         </button>
 
-        {/* User Session — Permanently Authenticated Operator */}
-        <div className="flex items-center space-x-1.5 pl-2 border-l border-slate-200">
-          <div
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-[#166534] font-medium"
-            title="Chief Dispatcher Session Active"
-          >
-            <UserCheck className="w-3.5 h-3.5 text-[#166534]" />
-            <span className="font-bold">{user?.name || 'Chief Dispatcher'}</span>
-          </div>
+        {/* User Session & Operator Controls */}
+        <div className="relative pl-2 border-l border-slate-200">
+          {user ? (
+            <div>
+              <button
+                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 text-xs text-[#166534] font-medium transition cursor-pointer"
+                title="Operator Session Active - Click to Manage"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-[#166534]" />
+                <span className="font-bold">{user.name}</span>
+                <ChevronDown className="w-3 h-3 text-emerald-700 ml-0.5" />
+              </button>
+
+              {userDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-xl py-2 z-50 animate-in fade-in duration-150">
+                  <div className="px-4 py-2 border-b border-slate-100">
+                    <div className="text-xs font-bold text-slate-800">{user.name}</div>
+                    <div className="text-[11px] text-slate-500 font-mono truncate">{user.email}</div>
+                    <div className="mt-1 inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 text-[10px] font-bold uppercase tracking-wider">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span>{user.role}</span>
+                    </div>
+                  </div>
+
+                  <div className="py-1">
+                    <button
+                      onClick={() => {
+                        setUserDropdownOpen(false);
+                        setActivePage('login');
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center space-x-2 transition"
+                    >
+                      <LogIn className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>Switch Operator Profile</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setUserDropdownOpen(false);
+                        logout();
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 flex items-center space-x-2 transition"
+                    >
+                      <LogOut className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={() => setActivePage('login')}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign In</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

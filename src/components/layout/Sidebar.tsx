@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   LayoutDashboard,
   ShieldAlert,
@@ -10,7 +9,8 @@ import {
   Radio,
   RotateCcw,
   Sparkles,
-  Globe
+  Globe,
+  LogIn
 } from 'lucide-react';
 import { useCityFlow, PageName } from '../../context/CityFlowContext';
 
@@ -21,7 +21,8 @@ export const Sidebar: React.FC = () => {
     alerts,
     systemStatus,
     startGuidedDemo,
-    resetAllData
+    resetAllData,
+    user
   } = useCityFlow();
 
   const unreadAlerts = alerts.filter(a => !a.acknowledged).length;
@@ -132,19 +133,27 @@ export const Sidebar: React.FC = () => {
 
         {/* User profile & Reset */}
         <div className="flex items-center justify-between pt-1">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-7 h-7 rounded-lg bg-[#166534] text-white flex items-center justify-center text-xs font-bold font-mono">
-              CF
+          <div
+            onClick={() => setActivePage('login')}
+            className="flex items-center space-x-2.5 cursor-pointer group flex-1 min-w-0 p-1 rounded-lg hover:bg-slate-100 transition"
+            title="Click to Switch Operator / Sign In"
+          >
+            <div className="w-7 h-7 rounded-lg bg-[#166534] text-white flex items-center justify-center text-xs font-bold font-mono group-hover:bg-[#14532d] transition shrink-0">
+              {user ? user.name.slice(0, 2).toUpperCase() : 'CF'}
             </div>
-            <div className="text-left">
-              <p className="text-xs font-bold text-slate-800 leading-tight">Chief Dispatcher</p>
-              <p className="text-[10px] text-emerald-800 font-medium">Metro Logistics Hub</p>
+            <div className="text-left min-w-0 truncate">
+              <p className="text-xs font-bold text-slate-800 leading-tight truncate group-hover:text-emerald-800 transition">
+                {user?.name || 'Operator Sign In'}
+              </p>
+              <p className="text-[10px] text-emerald-800 font-medium truncate">
+                {user ? user.role.replace('_', ' ').toUpperCase() : 'Click to Log In'}
+              </p>
             </div>
           </div>
           <button
             onClick={resetAllData}
             title="Reset system state"
-            className="p-1.5 rounded-lg hover:bg-slate-200/80 text-slate-400 hover:text-slate-700 transition"
+            className="p-1.5 rounded-lg hover:bg-slate-200/80 text-slate-400 hover:text-slate-700 transition shrink-0"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>

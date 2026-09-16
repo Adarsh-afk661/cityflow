@@ -4,6 +4,7 @@ import { SimulationProvider } from './context/SimulationContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { TopNav } from './components/layout/TopNav';
 import { LandingPage } from './components/landing/LandingPage';
+import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { RouteShieldPage } from './pages/RouteShieldPage';
 import { FleetPage } from './pages/FleetPage';
@@ -24,6 +25,15 @@ const AppContent: React.FC = () => {
       <>
         <LandingPage onNavigatePlatform={setActivePage} />
         <LoginModal />
+        <DataFeedModal />
+      </>
+    );
+  }
+
+  if (activePage === 'login') {
+    return (
+      <>
+        <LoginPage />
         <DataFeedModal />
       </>
     );

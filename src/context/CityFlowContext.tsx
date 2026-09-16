@@ -24,7 +24,7 @@ import { calculateDynamicRoutes, RouteEndpoints } from '../services/dynamicRouti
 import { searchDelhiPlaces, findClosestPlace, DELHI_NCR_PLACES } from '../services/delhiPlaces';
 import { resolveLocationCoordinates } from '../services/universalGeocoder';
 
-export type PageName = 'landing' | 'dashboard' | 'routeshield' | 'fleet' | 'whatif' | 'analytics' | 'alerts' | 'settings';
+export type PageName = 'landing' | 'login' | 'dashboard' | 'routeshield' | 'fleet' | 'whatif' | 'analytics' | 'alerts' | 'settings';
 
 interface CityFlowContextType {
   activePage: PageName;
@@ -37,6 +37,7 @@ interface CityFlowContextType {
   setUser: (user: User | null) => void;
   loginModalOpen: boolean;
   setLoginModalOpen: (open: boolean) => void;
+  loginAs: (user: User) => void;
   logout: () => void;
 
   // Manual Data Feeding
@@ -542,11 +543,20 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
     } catch (e) {}
   };
 
-  const logout = () => {
-    setUser(DEFAULT_OPERATOR);
+  const loginAs = (newUser: User) => {
+    setUser(newUser);
     try {
-      localStorage.setItem('cityflow_user', JSON.stringify(DEFAULT_OPERATOR));
+      localStorage.setItem('cityflow_user', JSON.stringify(newUser));
     } catch (e) {}
+    setActivePage('dashboard');
+  };
+
+  const logout = () => {
+    setUser(null);
+    try {
+      localStorage.removeItem('cityflow_user');
+    } catch (e) {}
+    setActivePage('login');
   };
 
 
@@ -619,6 +629,7 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
         setUser,
         loginModalOpen,
         setLoginModalOpen,
+        loginAs,
         logout,
         dataFeedModalOpen,
         setDataFeedModalOpen,

@@ -40,6 +40,10 @@ interface CityFlowContextType {
   loginAs: (user: User) => void;
   logout: () => void;
 
+  // Mobile navigation
+  mobileMenuOpen: boolean;
+  setMobileMenuOpen: (open: boolean) => void;
+
   // Manual Data Feeding
   dataFeedModalOpen: boolean;
   setDataFeedModalOpen: (open: boolean) => void;
@@ -117,27 +121,22 @@ interface CityFlowContextType {
 const CityFlowContext = createContext<CityFlowContextType | undefined>(undefined);
 
 export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [activePage, setActivePage] = useState<PageName>('landing');
+  const [activePage, setActivePage] = useState<PageName>(() => {
+    try {
+      const saved = localStorage.getItem('cityflow_user');
+      if (saved && JSON.parse(saved)) return 'dashboard';
+    } catch (e) {}
+    return 'login';
+  });
   const [selectedCity, setSelectedCity] = useState<string>('Delhi — Greater Noida Corridor');
-
-  // Permanent Authentication State — Never logs out
-  const DEFAULT_OPERATOR: User = {
-    id: 'op-chief-dispatcher',
-    name: 'Chief Dispatcher',
-    email: 'adarsh@cityflow.dev',
-    role: 'dispatcher',
-    isVerified: true
-  };
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   const [user, setUser] = useState<User | null>(() => {
     try {
       const saved = localStorage.getItem('cityflow_user');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    try {
-      localStorage.setItem('cityflow_user', JSON.stringify(DEFAULT_OPERATOR));
-    } catch (e) {}
-    return DEFAULT_OPERATOR;
+    return null;
   });
   const [loginModalOpen, setLoginModalOpen] = useState<boolean>(false);
   const [dataFeedModalOpen, setDataFeedModalOpen] = useState<boolean>(false);
@@ -631,6 +630,8 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
         setLoginModalOpen,
         loginAs,
         logout,
+        mobileMenuOpen,
+        setMobileMenuOpen,
         dataFeedModalOpen,
         setDataFeedModalOpen,
         addCustomRoute,

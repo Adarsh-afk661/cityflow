@@ -11,7 +11,8 @@ import {
   Database,
   LogIn,
   LogOut,
-  UserCheck
+  UserCheck,
+  Menu
 } from 'lucide-react';
 import { useCityFlow } from '../../context/CityFlowContext';
 import { DataStatusIndicator } from '../common/DataStatusIndicator';
@@ -32,7 +33,9 @@ export const TopNav: React.FC = () => {
     logout,
     setStartLocation,
     setDestinationLocation,
-    runRouteAnalysis
+    runRouteAnalysis,
+    mobileMenuOpen,
+    setMobileMenuOpen
   } = useCityFlow();
 
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
@@ -68,17 +71,26 @@ export const TopNav: React.FC = () => {
   const activeFleetCount = fleet.filter(f => f.status === 'active').length;
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-20 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+    <header className="h-16 bg-white border-b border-slate-200 px-3 sm:px-6 flex items-center justify-between sticky top-0 z-20 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
       {/* City Selector & Search */}
-      <div className="flex items-center space-x-4">
-        <div className="relative">
+      <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
+        <button
+          type="button"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="lg:hidden p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition shrink-0 cursor-pointer"
+          title="Toggle Navigation Menu"
+        >
+          <Menu className="w-5 h-5 text-slate-700" />
+        </button>
+
+        <div className="relative shrink-0">
           <button
             onClick={() => setCityDropdownOpen(!cityDropdownOpen)}
-            className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-800 transition"
+            className="flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-800 transition max-w-[160px] sm:max-w-none"
           >
-            <MapPin className="w-3.5 h-3.5 text-emerald-700" />
-            <span>{selectedCity}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            <MapPin className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+            <span className="truncate">{selectedCity.split(' — ')[0]}</span>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           </button>
 
           {cityDropdownOpen && (
@@ -99,7 +111,7 @@ export const TopNav: React.FC = () => {
         </div>
 
         {/* Global Search Bar */}
-        <div className="relative hidden md:block w-64">
+        <div className="relative hidden md:block w-48 lg:w-64">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -112,25 +124,27 @@ export const TopNav: React.FC = () => {
       </div>
 
       {/* Action Controls */}
-      <div className="flex items-center space-x-3">
+      <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
         {/* Toggle back to Product Landing Overview */}
         <button
           onClick={() => setActivePage('landing')}
-          className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-600 hover:text-slate-900 transition"
+          className="hidden xl:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-600 hover:text-slate-900 transition"
         >
           <Globe className="w-3.5 h-3.5 text-emerald-700" />
           <span>Product Overview</span>
         </button>
 
         {/* Real-time Data Freshness & Provider Status */}
-        <DataStatusIndicator />
+        <div className="hidden xl:block">
+          <DataStatusIndicator />
+        </div>
 
         {/* Live Simulation Control */}
-        <div className="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+        <div className="hidden md:flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
           <div className="flex items-center space-x-1.5">
             <span className={`w-2 h-2 rounded-full ${liveTrafficEnabled ? 'bg-emerald-600 animate-pulse' : 'bg-amber-500'}`} />
             <span className="text-xs font-mono font-medium text-slate-700">
-              {liveTrafficEnabled ? 'LIVE SIMULATION' : 'PAUSED'}
+              {liveTrafficEnabled ? 'LIVE' : 'PAUSED'}
             </span>
           </div>
           <div className="h-3 w-px bg-slate-200 mx-1" />
@@ -147,7 +161,7 @@ export const TopNav: React.FC = () => {
         {/* Active Fleet summary badge */}
         <div
           onClick={() => setActivePage('fleet')}
-          className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs cursor-pointer transition font-medium"
+          className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs cursor-pointer transition font-medium"
         >
           <span className="text-slate-500">Fleet Active:</span>
           <span className="font-mono font-bold text-emerald-800">{activeFleetCount} / {fleet.length}</span>
@@ -157,7 +171,7 @@ export const TopNav: React.FC = () => {
         <button
           id="top-nav-alerts-btn"
           onClick={() => setActivePage('alerts')}
-          className="relative p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900 transition"
+          className="relative p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900 transition shrink-0"
         >
           <Bell className="w-4 h-4" />
           {unreadAlerts.length > 0 && (
@@ -171,7 +185,7 @@ export const TopNav: React.FC = () => {
         <button
           id="top-feed-data-btn"
           onClick={() => setDataFeedModalOpen(true)}
-          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-xs font-semibold text-emerald-800 transition shadow-sm"
+          className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-xs font-semibold text-emerald-800 transition shadow-sm shrink-0"
           title="Manually feed commercial vehicles, freight corridors & hazard alerts to MongoDB Atlas"
         >
           <Database className="w-3.5 h-3.5 text-[#166534]" />
@@ -182,10 +196,11 @@ export const TopNav: React.FC = () => {
         <button
           id="top-launch-demo-btn"
           onClick={startGuidedDemo}
-          className="px-4 py-1.5 rounded-lg bg-[#166534] hover:bg-[#14532d] text-white font-semibold text-xs transition shadow-sm flex items-center space-x-1.5"
+          className="px-2.5 sm:px-4 py-1.5 rounded-lg bg-[#166534] hover:bg-[#14532d] text-white font-semibold text-xs transition shadow-sm flex items-center space-x-1.5 shrink-0"
         >
           <Sparkles className="w-3.5 h-3.5" />
-          <span>LAUNCH DEMO</span>
+          <span className="hidden sm:inline">LAUNCH DEMO</span>
+          <span className="sm:hidden">DEMO</span>
         </button>
 
         {/* User Session & Operator Controls */}

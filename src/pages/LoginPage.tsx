@@ -38,7 +38,7 @@ const PRESET_ROLES: PresetRole[] = [
     email: 'adarsh@cityflow.dev',
     desc: 'Full clearance overrides, live corridor re-routing, and manual chokepoint data feeding rights.',
     permissions: ['RouteShield Clearance', 'Corridor Overrides', 'Data Feed Studio', 'What-If Simulation'],
-    badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    badgeColor: 'bg-emerald-100 text-[#166534] border-emerald-300',
     initials: 'AD'
   },
   {
@@ -48,7 +48,7 @@ const PRESET_ROLES: PresetRole[] = [
     email: 'priya.sharma@ncrlogistics.in',
     desc: 'Commercial fleet telematics, gross weight compliance, and vehicle emission accounting.',
     permissions: ['Fleet Telematics', 'Axle & Weight Rules', 'Emission Audits', 'Active Dispatch Logs'],
-    badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+    badgeColor: 'bg-blue-100 text-blue-800 border-blue-300',
     initials: 'PS'
   },
   {
@@ -58,7 +58,7 @@ const PRESET_ROLES: PresetRole[] = [
     email: 'v.mehta@nhai-digital.gov.in',
     desc: 'National Highway underpass database management, API key provisioning, and global corridor safety limits.',
     permissions: ['Infrastructure DB', 'API Gateway Keys', 'Underpass Elevation Audits', 'Corridor Rules Engine'],
-    badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+    badgeColor: 'bg-purple-100 text-purple-800 border-purple-300',
     initials: 'VM'
   }
 ];
@@ -217,7 +217,7 @@ export const LoginPage: React.FC = () => {
           triggerConfetti();
           setTimeout(() => {
             loginAs(verifiedUser);
-          }, 1100);
+          }, 1000);
           return;
         }
       }
@@ -238,7 +238,7 @@ export const LoginPage: React.FC = () => {
       triggerConfetti();
       setTimeout(() => {
         loginAs(localUser);
-      }, 1100);
+      }, 1000);
       return;
     }
 
@@ -272,97 +272,89 @@ export const LoginPage: React.FC = () => {
       };
       triggerConfetti();
       loginAs(ssoUser);
-    }, 800);
+    }, 600);
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-emerald-500 selection:text-white relative overflow-hidden font-sans">
-      {/* Background Ambience & Grid */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-950/40 via-slate-950 to-slate-950 pointer-events-none" />
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none" />
-      <div className="absolute top-0 right-1/4 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
-      <div className="absolute bottom-0 left-10 w-96 h-96 bg-teal-600/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col justify-between selection:bg-emerald-100 selection:text-[#166534] relative font-sans">
+      {/* Subtle Light Decorative Gradients */}
+      <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-emerald-50/70 via-slate-50/40 to-transparent pointer-events-none" />
+      <div className="absolute top-10 right-10 w-96 h-96 bg-emerald-100/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 left-10 w-96 h-96 bg-teal-100/30 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Top Bar Header */}
-      <header className="relative z-10 w-full max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+      {/* Top Header Bar */}
+      <header className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between border-b border-slate-200/80 bg-white/70 backdrop-blur-md">
         <div
           onClick={() => setActivePage('landing')}
           className="flex items-center space-x-3 cursor-pointer group"
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-800 text-white flex items-center justify-center font-bold text-sm font-mono shadow-lg shadow-emerald-950/60 group-hover:scale-105 transition">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#166534] text-white flex items-center justify-center font-bold text-sm font-mono shadow-sm group-hover:bg-[#14532d] transition">
             CF
           </div>
           <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-extrabold text-xl tracking-tight text-white">CityFlow</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono font-bold border border-emerald-500/30">
+            <div className="flex items-center space-x-1.5">
+              <span className="font-extrabold text-lg sm:text-xl tracking-tight text-slate-900">CityFlow</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-mono font-bold border border-emerald-200">
                 PRO
               </span>
             </div>
-            <p className="text-xs text-slate-400 font-medium">Commercial Route Intelligence Platform</p>
+            <p className="text-[11px] text-slate-500 font-medium hidden sm:block">Commercial Route Intelligence Platform</p>
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3">
           <button
             onClick={() => setActivePage('landing')}
-            className="flex items-center space-x-2 px-3.5 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-xs font-semibold transition cursor-pointer"
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-semibold transition cursor-pointer shadow-xs"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Product Overview</span>
-          </button>
-          <button
-            onClick={() => setActivePage('dashboard')}
-            className="hidden sm:flex items-center space-x-2 px-3.5 py-1.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 hover:text-white border border-emerald-800/60 text-xs font-semibold transition cursor-pointer"
-          >
-            <span>Console Demo</span>
-            <ChevronRight className="w-3.5 h-3.5" />
+            <ArrowLeft className="w-3.5 h-3.5 text-slate-500" />
+            <span className="hidden xs:inline">Product</span> Overview
           </button>
         </div>
       </header>
 
-      {/* Main Dual-Column Content */}
-      <main className="relative z-10 w-full max-w-7xl mx-auto px-6 py-6 flex-1 flex items-center justify-center">
-        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+      {/* Main Dual-Column Responsive Content */}
+      <main className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10 flex-1 flex items-center justify-center">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center">
           
-          {/* Left Column: Corridor Telemetry & Brand Showcase */}
-          <div className="lg:col-span-6 space-y-6">
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>LIVE GIS ROUTE INTELLIGENCE</span>
+          {/* Left Column: Corridor Telemetry & Enterprise Overview (Order 2 on mobile, 1 on desktop) */}
+          <div className="lg:col-span-6 space-y-5 sm:space-y-6 order-2 lg:order-1">
+            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[#166534] text-xs font-mono font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>DELHI-NCR FLEET CORRIDOR CLEARANCE</span>
             </div>
 
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white leading-tight">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 leading-tight">
               Authenticate operator clearance before dispatch.
             </h1>
 
-            <p className="text-sm sm:text-base text-slate-300 max-w-xl leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-600 max-w-xl leading-relaxed">
               Every route plan is cross-validated against physical bridge heights, axle-load tolerances, and real-time congestion models across Delhi-NCR and intermodal freight corridors.
             </p>
 
-            {/* Interactive Corridor Telemetry Graphic */}
-            <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 backdrop-blur-md shadow-2xl relative overflow-hidden">
+            {/* Interactive Corridor Telemetry Graphic (Light Theme) */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-sm relative overflow-hidden">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-2">
-                  <Truck className="w-4 h-4 text-emerald-400" />
-                  <span className="text-xs font-bold text-slate-200">Delhi ➔ Greater Noida Corridor</span>
+                  <Truck className="w-4 h-4 text-[#166534]" />
+                  <span className="text-xs font-bold text-slate-800">Delhi ➔ Greater Noida Logistics Corridor</span>
                 </div>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
                   99.8% CLEARANCE
                 </span>
               </div>
 
               {/* Animated Mini Corridor SVG */}
-              <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80 mb-3">
-                <svg viewBox="0 0 420 80" className="w-full h-16">
-                  {/* Grid Lines */}
-                  <line x1="10" y1="40" x2="410" y2="40" stroke="#334155" strokeWidth="1" strokeDasharray="3 3" />
+              <div className="bg-[#f8fafc] p-3 rounded-xl border border-slate-200 mb-3">
+                <svg viewBox="0 0 420 80" className="w-full h-16 sm:h-20">
+                  {/* Subtle Grid Lines */}
+                  <line x1="10" y1="40" x2="410" y2="40" stroke="#e2e8f0" strokeWidth="1.5" strokeDasharray="3 3" />
                   
                   {/* Recommended Expressway Route */}
                   <path
                     d="M 20 60 C 110 60, 150 20, 240 20 S 330 50, 400 30"
                     fill="none"
-                    stroke="#10b981"
+                    stroke="#166534"
                     strokeWidth="3.5"
                     strokeLinecap="round"
                   />
@@ -373,100 +365,100 @@ export const LoginPage: React.FC = () => {
                     stroke="#f43f5e"
                     strokeWidth="2"
                     strokeDasharray="4 4"
-                    opacity="0.6"
+                    opacity="0.8"
                   />
 
-                  {/* Origin Pin */}
+                  {/* Origin Pin (Delhi) */}
                   <circle cx="20" cy="60" r="5" fill="#0284c7" stroke="#ffffff" strokeWidth="2" />
-                  <text x="20" y="75" fontSize="8" fontWeight="bold" fill="#94a3b8" textAnchor="middle">Delhi</text>
+                  <text x="20" y="76" fontSize="8.5" fontWeight="bold" fill="#475569" textAnchor="middle">Delhi</text>
 
-                  {/* Destination Pin */}
-                  <circle cx="400" cy="30" r="5" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
-                  <text x="400" y="20" fontSize="8" fontWeight="bold" fill="#34d399" textAnchor="middle">Gr. Noida</text>
+                  {/* Destination Pin (Gr. Noida) */}
+                  <circle cx="400" cy="30" r="5" fill="#166534" stroke="#ffffff" strokeWidth="2" />
+                  <text x="400" y="20" fontSize="8.5" fontWeight="bold" fill="#166534" textAnchor="middle">Gr. Noida</text>
 
-                  {/* Dynamic Moving Truck Indicator */}
-                  <circle r="4" fill="#ffffff" stroke="#10b981" strokeWidth="2">
+                  {/* Moving Vehicle Beacon */}
+                  <circle r="4" fill="#ffffff" stroke="#166534" strokeWidth="2.5">
                     <animateMotion dur="4s" repeatCount="indefinite" path="M 20 60 C 110 60, 150 20, 240 20 S 330 50, 400 30" />
                   </circle>
                 </svg>
               </div>
 
               {/* Corridor Spec Badges */}
-              <div className="grid grid-cols-3 gap-2 text-[11px] font-mono">
-                <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800">
-                  <span className="text-slate-500 block text-[10px]">VEHICLE CLASS</span>
-                  <span className="font-bold text-white">4.2m Heavy Truck</span>
+              <div className="grid grid-cols-3 gap-2 text-[10px] sm:text-[11px] font-mono">
+                <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                  <span className="text-slate-400 block text-[9px] font-sans font-medium">VEHICLE CLASS</span>
+                  <span className="font-bold text-slate-800">4.2m Heavy Truck</span>
                 </div>
-                <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800">
-                  <span className="text-slate-500 block text-[10px]">CHOKEPOINT</span>
-                  <span className="font-bold text-rose-400">Arch: 3.8m Barred</span>
+                <div className="p-2 rounded-lg bg-rose-50/70 border border-rose-200">
+                  <span className="text-rose-500 block text-[9px] font-sans font-medium">CRITICAL CHOKEPOINT</span>
+                  <span className="font-bold text-rose-700">Arch: 3.8m Barred</span>
                 </div>
-                <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800">
-                  <span className="text-slate-500 block text-[10px]">RECOMMENDED</span>
-                  <span className="font-bold text-emerald-400">Viaduct (5.2m Clear)</span>
+                <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200">
+                  <span className="text-emerald-700 block text-[9px] font-sans font-medium">RECOMMENDED</span>
+                  <span className="font-bold text-[#166534]">Viaduct (5.2m Clear)</span>
                 </div>
               </div>
             </div>
 
             {/* Live Infrastructure Counters */}
-            <div className="grid grid-cols-3 gap-4 pt-2">
-              <div className="border-l-2 border-emerald-500 pl-3">
-                <div className="text-xl font-bold font-mono text-white">31%</div>
-                <div className="text-xs text-slate-400">Fewer Missed Clearances</div>
+            <div className="grid grid-cols-3 gap-3 pt-1">
+              <div className="border-l-2 border-[#166534] pl-3">
+                <div className="text-lg sm:text-xl font-bold font-mono text-slate-900">31%</div>
+                <div className="text-[11px] text-slate-500">Fewer Missed Clearances</div>
               </div>
-              <div className="border-l-2 border-teal-500 pl-3">
-                <div className="text-xl font-bold font-mono text-white">18 min</div>
-                <div className="text-xs text-slate-400">Time Saved per Dispatch</div>
+              <div className="border-l-2 border-teal-600 pl-3">
+                <div className="text-lg sm:text-xl font-bold font-mono text-slate-900">18 min</div>
+                <div className="text-[11px] text-slate-500">Time Saved per Dispatch</div>
               </div>
-              <div className="border-l-2 border-cyan-500 pl-3">
-                <div className="text-xl font-bold font-mono text-white">2,400+</div>
-                <div className="text-xs text-slate-400">Active Daily Fleets</div>
+              <div className="border-l-2 border-emerald-600 pl-3">
+                <div className="text-lg sm:text-xl font-bold font-mono text-slate-900">2,400+</div>
+                <div className="text-[11px] text-slate-500">Active Daily Fleets</div>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Dynamic Authentication Card */}
-          <div className="lg:col-span-6 w-full max-w-lg mx-auto">
-            <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl relative overflow-hidden">
-              {/* Gradient Accent Bar */}
-              <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600" />
+          {/* Right Column: Dynamic Light Authentication Card (Order 1 on mobile, 2 on desktop) */}
+          <div className="lg:col-span-6 w-full max-w-lg mx-auto order-1 lg:order-2">
+            <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-7 md:p-8 shadow-xl shadow-slate-200/60 relative overflow-hidden">
+              {/* Green Brand Accent Line */}
+              <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-emerald-600 via-[#166534] to-teal-700" />
 
               {/* Mode Tabs */}
-              <div className="flex items-center space-x-1 p-1 bg-slate-950 rounded-2xl border border-slate-800 mb-6">
+              <div className="flex items-center space-x-1 p-1 bg-slate-100 rounded-2xl border border-slate-200 mb-6">
                 <button
                   type="button"
                   onClick={() => { setActiveTab('otp'); setErrorMsg(null); }}
-                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition flex items-center justify-center space-x-1.5 cursor-pointer ${
+                  className={`flex-1 py-2 px-2 sm:px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer ${
                     activeTab === 'otp'
-                      ? 'bg-emerald-700 text-white shadow-sm'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-white text-[#166534] shadow-xs border border-slate-200'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <Mail className="w-3.5 h-3.5" />
+                  <Mail className="w-3.5 h-3.5 text-[#166534]" />
                   <span>OTP Sign In</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => { setActiveTab('roles'); setErrorMsg(null); }}
-                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition flex items-center justify-center space-x-1.5 cursor-pointer ${
+                  className={`flex-1 py-2 px-2 sm:px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer ${
                     activeTab === 'roles'
-                      ? 'bg-emerald-700 text-white shadow-sm'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-white text-[#166534] shadow-xs border border-slate-200'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <Users className="w-3.5 h-3.5" />
+                  <Users className="w-3.5 h-3.5 text-[#166534]" />
                   <span>1-Click Roles</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => { setActiveTab('sso'); setErrorMsg(null); }}
-                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition flex items-center justify-center space-x-1.5 cursor-pointer ${
+                  className={`flex-1 py-2 px-2 sm:px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer ${
                     activeTab === 'sso'
-                      ? 'bg-emerald-700 text-white shadow-sm'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-white text-[#166534] shadow-xs border border-slate-200'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <Building2 className="w-3.5 h-3.5" />
+                  <Building2 className="w-3.5 h-3.5 text-[#166534]" />
                   <span>Enterprise SSO</span>
                 </button>
               </div>
@@ -477,20 +469,20 @@ export const LoginPage: React.FC = () => {
                   {step === 'email' && (
                     <div>
                       <div className="flex items-center space-x-3 mb-4">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
-                          <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                        <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#166534] border border-emerald-200 flex items-center justify-center">
+                          <ShieldCheck className="w-5 h-5 text-[#166534]" />
                         </div>
                         <div>
-                          <h2 className="text-lg font-bold text-white">Operator Sign In</h2>
-                          <p className="text-xs text-slate-400">MongoDB Atlas Verified Identity</p>
+                          <h2 className="text-lg font-bold text-slate-900">Operator Sign In</h2>
+                          <p className="text-xs text-slate-500">MongoDB Atlas Verified Identity</p>
                         </div>
                       </div>
 
-                      <p className="text-xs text-slate-400 mb-5 leading-relaxed">
+                      <p className="text-xs text-slate-600 mb-5 leading-relaxed">
                         Enter your email address to receive an instant 6-digit verification code. Authenticated operators gain real-time commercial fleet clearance and manual corridor feeding rights.
                       </p>
 
-                      {/* Quick Shortcut to Chief Dispatcher */}
+                      {/* Instant Chief Dispatcher 1-Click Access */}
                       <div className="mb-4">
                         <button
                           type="button"
@@ -505,51 +497,51 @@ export const LoginPage: React.FC = () => {
                             triggerConfetti();
                             loginAs(op);
                           }}
-                          className="w-full py-2.5 px-4 rounded-xl bg-emerald-950/70 hover:bg-emerald-900/80 border border-emerald-600/40 text-emerald-300 font-bold text-xs flex items-center justify-center space-x-2 transition shadow-sm cursor-pointer"
+                          className="w-full py-2.5 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-[#166534] font-bold text-xs flex items-center justify-center space-x-2 transition shadow-xs cursor-pointer"
                         >
-                          <Sparkles className="w-4 h-4 text-emerald-400" />
+                          <Sparkles className="w-4 h-4 text-[#166534]" />
                           <span>⚡ Instant Access as Chief Dispatcher</span>
                         </button>
 
-                        <div className="flex items-center my-3 text-[10px] text-slate-500 uppercase font-mono">
-                          <span className="flex-1 border-b border-slate-800" />
+                        <div className="flex items-center my-3 text-[10px] text-slate-400 uppercase font-mono">
+                          <span className="flex-1 border-b border-slate-200" />
                           <span className="px-2">or sign in with email</span>
-                          <span className="flex-1 border-b border-slate-800" />
+                          <span className="flex-1 border-b border-slate-200" />
                         </div>
                       </div>
 
                       {errorMsg && (
-                        <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-400 flex items-center space-x-2">
-                          <AlertTriangle className="w-4 h-4 shrink-0" />
+                        <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center space-x-2 font-medium">
+                          <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
                           <span>{errorMsg}</span>
                         </div>
                       )}
 
                       <form onSubmit={handleSendOtp} className="space-y-4">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                             Corporate / Operator Email
                           </label>
                           <div className="relative">
-                            <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                            <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                             <input
                               type="email"
                               required
                               placeholder="e.g. adarsh@cityflow.dev or dispatch@freight.com"
                               value={email}
                               onChange={e => setEmail(e.target.value)}
-                              className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                              className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-600 focus:bg-white transition"
                             />
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between text-xs text-slate-400">
+                        <div className="flex items-center justify-between text-xs text-slate-500">
                           <label className="flex items-center space-x-2 cursor-pointer select-none">
                             <input
                               type="checkbox"
                               checked={rememberMe}
                               onChange={e => setRememberMe(e.target.checked)}
-                              className="rounded bg-slate-950 border-slate-700 text-emerald-600 focus:ring-0"
+                              className="rounded border-slate-300 text-[#166534] focus:ring-emerald-500"
                             />
                             <span>Keep operator session active</span>
                           </label>
@@ -558,12 +550,12 @@ export const LoginPage: React.FC = () => {
                         <button
                           type="submit"
                           disabled={isLoading}
-                          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 disabled:opacity-50 text-white font-semibold text-sm flex items-center justify-center space-x-2 transition shadow-lg shadow-emerald-950/60 cursor-pointer"
+                          className="w-full py-3 px-4 rounded-xl bg-[#166534] hover:bg-[#14532d] disabled:opacity-50 text-white font-semibold text-sm flex items-center justify-center space-x-2 transition shadow-sm cursor-pointer"
                         >
                           {isLoading ? (
                             <>
                               <RefreshCw className="w-4 h-4 animate-spin" />
-                              <span>Sending Secure Code...</span>
+                              <span>Sending Verification Code...</span>
                             </>
                           ) : (
                             <>
@@ -579,36 +571,36 @@ export const LoginPage: React.FC = () => {
                   {step === 'otp' && (
                     <div>
                       <div className="flex items-center space-x-3 mb-4">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
-                          <KeyRound className="w-5 h-5 text-emerald-400" />
+                        <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#166534] border border-emerald-200 flex items-center justify-center">
+                          <KeyRound className="w-5 h-5 text-[#166534]" />
                         </div>
                         <div>
-                          <h2 className="text-lg font-bold text-white">Enter Verification Code</h2>
-                          <p className="text-xs text-slate-400">
-                            Sent to: <span className="font-semibold text-emerald-300">{email}</span>
+                          <h2 className="text-lg font-bold text-slate-900">Enter Verification Code</h2>
+                          <p className="text-xs text-slate-500">
+                            Sent to: <span className="font-semibold text-slate-800">{email}</span>
                           </p>
                         </div>
                       </div>
 
                       {/* Instant Code Helper Box */}
                       {sentCode && (
-                        <div className="mb-5 p-3.5 rounded-xl bg-emerald-950/50 border border-emerald-600/40">
+                        <div className="mb-5 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold">
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-800 font-bold">
                               One-Time Security Code
                             </span>
-                            <span className="text-[10px] text-emerald-300 bg-emerald-900/60 px-2 py-0.5 rounded font-mono font-bold border border-emerald-700/50">
+                            <span className="text-[10px] text-emerald-700 bg-white px-2 py-0.5 rounded font-mono font-bold border border-emerald-200">
                               Instant Access
                             </span>
                           </div>
                           <div className="mt-1.5 flex items-center justify-between">
-                            <span className="text-2xl font-mono font-black text-white tracking-widest">
+                            <span className="text-2xl font-mono font-black text-emerald-950 tracking-widest">
                               {sentCode}
                             </span>
                             <button
                               type="button"
                               onClick={handleAutofillCode}
-                              className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 underline cursor-pointer"
+                              className="text-xs font-semibold text-[#166534] hover:text-[#14532d] underline cursor-pointer"
                             >
                               ⚡ Autofill Code
                             </button>
@@ -617,20 +609,20 @@ export const LoginPage: React.FC = () => {
                       )}
 
                       {errorMsg && (
-                        <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-400 flex items-center space-x-2">
-                          <AlertTriangle className="w-4 h-4 shrink-0" />
+                        <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center space-x-2 font-medium">
+                          <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
                           <span>{errorMsg}</span>
                         </div>
                       )}
 
                       <form onSubmit={handleVerifyOtp} className="space-y-5">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-2 text-center">
+                          <label className="block text-xs font-semibold text-slate-700 mb-2 text-center">
                             Enter 6-Digit Code
                           </label>
 
-                          {/* 6 Segmented Inputs */}
-                          <div className="grid grid-cols-6 gap-2">
+                          {/* 6 Responsive Segmented Inputs */}
+                          <div className="grid grid-cols-6 gap-1.5 sm:gap-2 max-w-sm mx-auto">
                             {otpDigits.map((digit, idx) => (
                               <input
                                 key={idx}
@@ -641,7 +633,7 @@ export const LoginPage: React.FC = () => {
                                 value={digit}
                                 onChange={e => handleOtpChange(idx, e.target.value)}
                                 onKeyDown={e => handleOtpKeyDown(idx, e)}
-                                className="w-full aspect-square bg-slate-950 border border-slate-700 rounded-xl text-center text-xl font-mono font-bold text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                                className="w-full aspect-square bg-slate-50 border border-slate-300 rounded-xl text-center text-lg sm:text-xl font-mono font-bold text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white transition"
                               />
                             ))}
                           </div>
@@ -650,7 +642,7 @@ export const LoginPage: React.FC = () => {
                         <button
                           type="submit"
                           disabled={isLoading}
-                          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 disabled:opacity-50 text-white font-semibold text-sm flex items-center justify-center space-x-2 transition shadow-lg shadow-emerald-950/60 cursor-pointer"
+                          className="w-full py-3 px-4 rounded-xl bg-[#166534] hover:bg-[#14532d] disabled:opacity-50 text-white font-semibold text-sm flex items-center justify-center space-x-2 transition shadow-sm cursor-pointer"
                         >
                           {isLoading ? (
                             <>
@@ -666,11 +658,11 @@ export const LoginPage: React.FC = () => {
                         </button>
                       </form>
 
-                      <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
+                      <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
                         <button
                           type="button"
                           onClick={() => { setStep('email'); setOtpDigits(['', '', '', '', '', '']); setErrorMsg(null); }}
-                          className="hover:text-white underline cursor-pointer"
+                          className="hover:text-slate-800 underline cursor-pointer"
                         >
                           Change Email
                         </button>
@@ -680,8 +672,8 @@ export const LoginPage: React.FC = () => {
                           onClick={() => handleSendOtp()}
                           className={`font-semibold cursor-pointer ${
                             canResend
-                              ? 'text-emerald-400 hover:underline'
-                              : 'text-slate-600 cursor-not-allowed'
+                              ? 'text-[#166534] hover:underline'
+                              : 'text-slate-400 cursor-not-allowed'
                           }`}
                         >
                           {canResend ? 'Resend Code' : `Resend in ${resendTimer}s`}
@@ -691,15 +683,15 @@ export const LoginPage: React.FC = () => {
                   )}
 
                   {step === 'success' && (
-                    <div className="py-8 text-center space-y-4">
-                      <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-2xl flex items-center justify-center mx-auto animate-bounce">
-                        <CheckCircle className="w-10 h-10 text-emerald-400" />
+                    <div className="py-8 text-center space-y-3">
+                      <div className="w-16 h-16 bg-emerald-100 text-[#166534] border border-emerald-200 rounded-2xl flex items-center justify-center mx-auto animate-bounce">
+                        <CheckCircle className="w-10 h-10 text-[#166534]" />
                       </div>
-                      <h3 className="text-xl font-extrabold text-white">Access Verified!</h3>
-                      <p className="text-xs text-slate-300">
-                        Authenticated as <span className="font-semibold text-emerald-400">{email}</span>
+                      <h3 className="text-xl font-extrabold text-slate-900">Access Verified!</h3>
+                      <p className="text-xs text-slate-500">
+                        Authenticated as <span className="font-semibold text-slate-800">{email}</span>
                       </p>
-                      <div className="text-[11px] text-emerald-300 font-mono bg-emerald-950/80 border border-emerald-700/50 py-2 px-3 rounded-xl inline-block">
+                      <div className="text-[11px] text-emerald-800 font-mono bg-emerald-50 border border-emerald-200 py-2 px-3 rounded-xl inline-block font-semibold">
                         ✓ Permissions Loaded: Route Intelligence & Data Feeding
                       </div>
                     </div>
@@ -709,34 +701,34 @@ export const LoginPage: React.FC = () => {
 
               {/* ================= TAB 2: 1-CLICK ROLE PROFILES ================= */}
               {activeTab === 'roles' && (
-                <div className="space-y-4">
+                <div className="space-y-3.5">
                   <div className="flex items-center justify-between mb-2">
                     <div>
-                      <h3 className="text-base font-bold text-white">Select Operator Profile</h3>
-                      <p className="text-xs text-slate-400">Instantly enter CityFlow with designated clearance privileges</p>
+                      <h3 className="text-base font-bold text-slate-900">Select Operator Profile</h3>
+                      <p className="text-xs text-slate-500">Instantly enter CityFlow with designated clearance privileges</p>
                     </div>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                      PRE-CONFIGURED
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-50 text-[#166534] border border-emerald-200">
+                      PRESET
                     </span>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-2.5">
                     {PRESET_ROLES.map(preset => (
                       <div
                         key={preset.role}
                         onClick={() => handleSelectPresetRole(preset)}
-                        className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-emerald-600/70 hover:bg-slate-950 transition cursor-pointer group"
+                        className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 transition cursor-pointer group shadow-2xs"
                       >
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center space-x-2.5">
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-800 text-white font-bold font-mono text-xs flex items-center justify-center shadow-sm">
+                            <div className="w-8 h-8 rounded-xl bg-[#166534] text-white font-bold font-mono text-xs flex items-center justify-center shadow-xs">
                               {preset.initials}
                             </div>
                             <div>
-                              <div className="text-xs font-bold text-white group-hover:text-emerald-300 transition">
+                              <div className="text-xs font-bold text-slate-900 group-hover:text-[#166534] transition">
                                 {preset.name}
                               </div>
-                              <div className="text-[10px] text-slate-400">{preset.email}</div>
+                              <div className="text-[10px] text-slate-500">{preset.email}</div>
                             </div>
                           </div>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${preset.badgeColor}`}>
@@ -744,7 +736,7 @@ export const LoginPage: React.FC = () => {
                           </span>
                         </div>
 
-                        <p className="text-[11px] text-slate-400 leading-snug mb-2 pl-10">
+                        <p className="text-[11px] text-slate-600 leading-snug mb-2 pl-10">
                           {preset.desc}
                         </p>
 
@@ -752,7 +744,7 @@ export const LoginPage: React.FC = () => {
                           {preset.permissions.map((p, i) => (
                             <span
                               key={i}
-                              className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300"
+                              className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700"
                             >
                               ✓ {p}
                             </span>
@@ -762,7 +754,7 @@ export const LoginPage: React.FC = () => {
                     ))}
                   </div>
 
-                  <p className="text-[11px] text-slate-500 text-center pt-2">
+                  <p className="text-[11px] text-slate-400 text-center pt-1">
                     Click any profile above to instantly load role credentials into session.
                   </p>
                 </div>
@@ -772,77 +764,77 @@ export const LoginPage: React.FC = () => {
               {activeTab === 'sso' && (
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-base font-bold text-white">Single Sign-On (SSO)</h3>
-                    <p className="text-xs text-slate-400">Enterprise gateway for commercial fleet operators & municipal logistics</p>
+                    <h3 className="text-base font-bold text-slate-900">Single Sign-On (SSO)</h3>
+                    <p className="text-xs text-slate-500">Enterprise gateway for commercial fleet operators & municipal logistics</p>
                   </div>
 
-                  <div className="space-y-3 pt-2">
+                  <div className="space-y-2.5 pt-1">
                     <button
                       type="button"
                       disabled={isLoading}
                       onClick={() => handleSsoLogin('Google Workspace')}
-                      className="w-full py-3 px-4 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-white text-xs font-semibold flex items-center justify-between transition cursor-pointer group"
+                      className="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold flex items-center justify-between transition cursor-pointer shadow-xs group"
                     >
                       <div className="flex items-center space-x-3">
-                        <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center font-bold text-rose-400">
+                        <div className="w-7 h-7 rounded-lg bg-rose-50 border border-rose-200 flex items-center justify-center font-bold text-rose-600">
                           G
                         </div>
                         <div className="text-left">
                           <span className="block font-bold">Google Enterprise Workspace</span>
-                          <span className="text-[10px] text-slate-400">Fleet operator identity</span>
+                          <span className="text-[10px] text-slate-500">Fleet operator identity</span>
                         </div>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-white transition" />
+                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-800 transition" />
                     </button>
 
                     <button
                       type="button"
                       disabled={isLoading}
                       onClick={() => handleSsoLogin('Microsoft Azure AD')}
-                      className="w-full py-3 px-4 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-white text-xs font-semibold flex items-center justify-between transition cursor-pointer group"
+                      className="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold flex items-center justify-between transition cursor-pointer shadow-xs group"
                     >
                       <div className="flex items-center space-x-3">
-                        <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center font-bold text-blue-400">
+                        <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center font-bold text-blue-600">
                           M
                         </div>
                         <div className="text-left">
                           <span className="block font-bold">Microsoft Azure AD Fleet Portal</span>
-                          <span className="text-[10px] text-slate-400">SAML 2.0 / OIDC Verified</span>
+                          <span className="text-[10px] text-slate-500">SAML 2.0 / OIDC Verified</span>
                         </div>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-white transition" />
+                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-800 transition" />
                     </button>
 
                     <button
                       type="button"
                       disabled={isLoading}
                       onClick={() => handleSsoLogin('NHAI Logistics Gateway')}
-                      className="w-full py-3 px-4 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-white text-xs font-semibold flex items-center justify-between transition cursor-pointer group"
+                      className="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold flex items-center justify-between transition cursor-pointer shadow-xs group"
                     >
                       <div className="flex items-center space-x-3">
-                        <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center font-bold text-emerald-400">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center font-bold text-[#166534]">
                           NH
                         </div>
                         <div className="text-left">
                           <span className="block font-bold">NHAI Logistics Gateway</span>
-                          <span className="text-[10px] text-slate-400">National Highway Authority Clearance</span>
+                          <span className="text-[10px] text-slate-500">National Highway Authority Clearance</span>
                         </div>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-white transition" />
+                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-800 transition" />
                     </button>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center space-x-2 text-[11px] text-slate-400">
-                    <Lock className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center space-x-2 text-[11px] text-slate-600">
+                    <Lock className="w-4 h-4 text-[#166534] shrink-0" />
                     <span>Protected by 256-bit encryption with audit trails logged to MongoDB Atlas.</span>
                   </div>
                 </div>
               )}
 
-              {/* Bottom Footer Status within Card */}
-              <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500">
+              {/* Card Footer Status */}
+              <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
                 <span className="flex items-center space-x-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
                   <span>MongoDB Atlas Connected</span>
                 </span>
                 <span>Role: Route Intelligence</span>
@@ -854,33 +846,21 @@ export const LoginPage: React.FC = () => {
       </main>
 
       {/* Footer System Status Strip */}
-      <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-4 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
-        <div className="flex items-center space-x-4">
+      <footer className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2 bg-white/50">
+        <div className="flex items-center space-x-2 sm:space-x-4 text-center sm:text-left">
           <span>© 2026 CityFlow Technologies</span>
           <span>•</span>
-          <span className="font-mono text-emerald-400">Delhi-NCR Metropolitan Freight Network</span>
+          <span className="font-mono text-[#166534] font-semibold">Delhi-NCR Metropolitan Freight Network</span>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-3 sm:space-x-4">
           <button
-            onClick={() => setActivePage('routeshield')}
-            className="hover:text-slate-300 transition cursor-pointer"
+            onClick={() => setActivePage('landing')}
+            className="hover:text-slate-800 transition cursor-pointer"
           >
-            RouteShield Engine
+            Platform Overview
           </button>
           <span>•</span>
-          <button
-            onClick={() => setActivePage('fleet')}
-            className="hover:text-slate-300 transition cursor-pointer"
-          >
-            Fleet Telematics
-          </button>
-          <span>•</span>
-          <button
-            onClick={() => setActivePage('settings')}
-            className="hover:text-slate-300 transition cursor-pointer"
-          >
-            System Status
-          </button>
+          <span className="text-emerald-700 font-medium">Clearance Verified</span>
         </div>
       </footer>
     </div>

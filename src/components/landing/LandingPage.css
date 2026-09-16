@@ -145,26 +145,38 @@
 }
 
 .city-landing .btn.primary {
-  background: var(--city-green);
+  background: linear-gradient(135deg, #166534, #14532d);
   color: #fff;
-  border-color: var(--city-green);
-  box-shadow: 0 1px 2px rgba(18,82,47,0.15), 0 6px 16px rgba(18,82,47,0.18);
+  border-color: #166534;
+  box-shadow: 0 2px 6px rgba(22, 101, 52, 0.2), 0 8px 20px rgba(22, 101, 52, 0.15);
+  font-weight: 700;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .city-landing .btn.primary:hover {
-  background: var(--city-green-dark);
+  background: linear-gradient(135deg, #15803d, #166534);
+  box-shadow: 0 4px 12px rgba(22, 101, 52, 0.3), 0 12px 24px rgba(22, 101, 52, 0.2);
+  transform: translateY(-1.5px);
 }
 
 .city-landing .btn.ghost {
   border: none;
   background: none;
-  padding: 10px 4px;
+  padding: 10px 12px;
   color: var(--city-ink-2);
+  font-weight: 600;
+  transition: color 0.15s ease;
 }
 
 .city-landing .btn.ghost:hover {
   color: var(--city-ink);
-  transform: none;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 8px;
+}
+
+.city-landing .route-mini.selected-ring {
+  box-shadow: 0 2px 10px rgba(22, 101, 52, 0.15), 0 0 0 1.5px #166534 !important;
+  transform: translateX(3px);
 }
 
 /* ===== Hero ===== */

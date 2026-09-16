@@ -10,6 +10,7 @@ interface LandingPageProps {
 export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) => {
   const { setLoginModalOpen } = useCityFlow();
   const [demoOpen, setDemoOpen] = useState(false);
+  const [selectedRoutePreview, setSelectedRoutePreview] = useState<'A' | 'B' | 'C'>('B');
 
   const handleLaunchPlatform = (targetPage: PageName = 'dashboard') => {
     onNavigatePlatform(targetPage);
@@ -22,7 +23,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) 
       <nav className="nav">
         <div className="nav-inner">
           <div className="brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <div className="brand-mark">C</div>CityFlow
+            <div className="brand-mark">C</div>
+            <span>CityFlow</span>
+            <span style={{ fontSize: '10px', background: '#ecfdf5', color: '#166534', padding: '1px 6px', borderRadius: '4px', border: '1px solid #bbf7d0', fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>PRO</span>
           </div>
           <div className="nav-links">
             <button onClick={() => handleLaunchPlatform('routeshield')}>Platform</button>
@@ -32,8 +35,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) 
           </div>
           <div className="nav-cta">
             <button className="btn ghost" onClick={() => handleLaunchPlatform('login')}>Sign In</button>
-            <button className="btn ghost" onClick={() => handleLaunchPlatform('dashboard')}>Console (Live)</button>
-            <button className="btn primary" onClick={() => handleLaunchPlatform('routeshield')}>Open RouteShield</button>
+            <button className="btn primary" onClick={() => handleLaunchPlatform('routeshield')}>
+              <span>Launch RouteShield</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M5 12h14M13 6l6 6-6 6"/>
+              </svg>
+            </button>
           </div>
         </div>
       </nav>
@@ -51,13 +58,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) 
             </p>
             <div className="hero-ctas">
               <button className="btn primary" onClick={() => handleLaunchPlatform('routeshield')}>
-                Launch RouteShield
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <span>Launch RouteShield</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M5 12h14M13 6l6 6-6 6"/>
                 </svg>
               </button>
-              <button className="btn" onClick={() => handleLaunchPlatform('dashboard')}>
-                Open Command Center
+              <button className="btn" onClick={() => setDemoOpen(true)}>
+                <span>Guided Interactive Demo</span>
+                <span style={{ fontSize: '10px', background: '#ecfdf5', color: '#166534', padding: '2px 6px', borderRadius: '6px', fontWeight: 800, marginLeft: '6px' }}>⚡ LIVE</span>
               </button>
             </div>
             <div className="hero-stats">
@@ -112,7 +120,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) 
                 </div>
               </div>
 
-              <div className="route-mini barred">
+              {/* Interactive Route Cards with Live Selector */}
+              <div
+                className={`route-mini barred ${selectedRoutePreview === 'A' ? 'selected-ring' : ''}`}
+                onClick={() => setSelectedRoutePreview('A')}
+                style={{ cursor: 'pointer', transition: 'all 0.2s', borderLeftWidth: selectedRoutePreview === 'A' ? '4px' : '3px' }}
+                title="Click to view barred route on map"
+              >
                 <span>Route A · Direct Urban Arterial (3.8m Metro Arch)</span>
                 <div className="meta">
                   <span className="mono">42 min</span>
@@ -120,7 +134,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) 
                 </div>
               </div>
 
-              <div className="route-mini selected">
+              <div
+                className={`route-mini selected ${selectedRoutePreview === 'B' ? 'selected-ring' : ''}`}
+                onClick={() => setSelectedRoutePreview('B')}
+                style={{ cursor: 'pointer', transition: 'all 0.2s', borderLeftWidth: selectedRoutePreview === 'B' ? '4px' : '3px' }}
+                title="Click to view recommended route on map"
+              >
                 <span>Route B · Noida-Gr. Noida Expressway &amp; Viaduct</span>
                 <div className="meta">
                   <span className="mono">34 min</span>
@@ -128,7 +147,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) 
                 </div>
               </div>
 
-              <div className="route-mini" style={{ opacity: 0.75 }}>
+              <div
+                className={`route-mini ${selectedRoutePreview === 'C' ? 'selected-ring' : ''}`}
+                onClick={() => setSelectedRoutePreview('C')}
+                style={{ cursor: 'pointer', transition: 'all 0.2s', opacity: selectedRoutePreview === 'C' ? 1 : 0.8, borderLeftWidth: selectedRoutePreview === 'C' ? '4px' : '3px' }}
+                title="Click to view eco-flow ring route on map"
+              >
                 <span>Route C · Regional Ring Viaduct Bypass (5.2m Clear)</span>
                 <div className="meta">
                   <span className="mono">38 min</span>
@@ -136,24 +160,64 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) 
                 </div>
               </div>
 
+              {/* Dynamic Interactive SVG Map without text clipping */}
               <div className="sim-map">
-                <svg viewBox="0 0 420 120" width="100%">
-                  {/* Subtle grid reference lines */}
-                  <line x1="20" y1="95" x2="400" y2="95" stroke="#f1f5f9" strokeWidth="1.5" />
-                  <line x1="20" y1="50" x2="400" y2="50" stroke="#f1f5f9" strokeWidth="1.5" strokeDasharray="3 3" />
-                  {/* Recommended path in vibrant emerald */}
-                  <path d="M20 95 C 100 95, 130 30, 210 30 S 320 80, 400 20" fill="none" stroke="var(--city-green)" strokeWidth="3" strokeLinecap="round"/>
-                  {/* Barred path in muted rose dashed */}
-                  <path d="M20 95 C 70 75, 110 85, 150 85" fill="none" stroke="#f43f5e" strokeWidth="2" strokeDasharray="4 4" opacity="0.7"/>
-                  {/* Origin pin (Delhi) */}
-                  <circle cx="20" cy="95" r="5.5" fill="var(--city-teal)" stroke="#ffffff" strokeWidth="2"/>
-                  <text x="20" y="112" fontSize="9.5" fontWeight="700" fill="#475569" textAnchor="middle">Delhi (Origin)</text>
+                <svg viewBox="0 0 440 125" width="100%">
+                  {/* Grid reference lines */}
+                  <line x1="30" y1="95" x2="410" y2="95" stroke="#f1f5f9" strokeWidth="1.5" />
+                  <line x1="30" y1="50" x2="410" y2="50" stroke="#f1f5f9" strokeWidth="1.5" strokeDasharray="3 3" />
+
+                  {/* Route B: Recommended Path */}
+                  <path
+                    d="M 35 95 C 115 95, 145 30, 225 30 S 335 80, 405 25"
+                    fill="none"
+                    stroke={selectedRoutePreview === 'B' ? 'var(--city-green)' : '#94a3b8'}
+                    strokeWidth={selectedRoutePreview === 'B' ? 3.5 : 2}
+                    strokeLinecap="round"
+                    opacity={selectedRoutePreview === 'B' ? 1 : 0.5}
+                  />
+
+                  {/* Route A: Barred Path */}
+                  <path
+                    d="M 35 95 C 85 75, 125 85, 165 85"
+                    fill="none"
+                    stroke={selectedRoutePreview === 'A' ? '#e11d48' : '#f43f5e'}
+                    strokeWidth={selectedRoutePreview === 'A' ? 3.5 : 2}
+                    strokeDasharray="4 4"
+                    opacity={selectedRoutePreview === 'A' ? 1 : 0.6}
+                  />
+
+                  {/* Route C: Eco Bypass */}
+                  <path
+                    d="M 35 95 C 120 115, 200 80, 280 60 S 360 40, 405 25"
+                    fill="none"
+                    stroke={selectedRoutePreview === 'C' ? '#d97706' : '#cbd5e1'}
+                    strokeWidth={selectedRoutePreview === 'C' ? 3.5 : 1.8}
+                    strokeDasharray={selectedRoutePreview === 'C' ? 'none' : '3 3'}
+                    opacity={selectedRoutePreview === 'C' ? 1 : 0.6}
+                  />
+
+                  {/* Origin pin (Delhi) - positioned with padding to avoid any crop */}
+                  <circle cx="35" cy="95" r="6" fill="var(--city-teal)" stroke="#ffffff" strokeWidth="2.5"/>
+                  <text x="35" y="115" fontSize="10" fontWeight="700" fill="#334155" textAnchor="start">Delhi (Origin)</text>
+
                   {/* Destination pin (Greater Noida) */}
-                  <circle cx="400" cy="20" r="5.5" fill="var(--city-green)" stroke="#ffffff" strokeWidth="2"/>
-                  <text x="395" y="12" fontSize="9.5" fontWeight="700" fill="#166534" textAnchor="end">Greater Noida (Dest)</text>
-                  {/* Animated vehicle dot moving along the expressway */}
-                  <circle r="4.5" fill="#ffffff" stroke="var(--city-green)" strokeWidth="2.5">
-                    <animateMotion dur="4.5s" repeatCount="indefinite" path="M20 95 C 100 95, 130 30, 210 30 S 320 80, 400 20"/>
+                  <circle cx="405" cy="25" r="6" fill="var(--city-green)" stroke="#ffffff" strokeWidth="2.5"/>
+                  <text x="405" y="14" fontSize="10" fontWeight="700" fill="#166534" textAnchor="end">Greater Noida (Dest)</text>
+
+                  {/* Animated moving vehicle indicator */}
+                  <circle r="4.5" fill="#ffffff" stroke={selectedRoutePreview === 'A' ? '#e11d48' : selectedRoutePreview === 'C' ? '#d97706' : 'var(--city-green)'} strokeWidth="2.5">
+                    <animateMotion
+                      dur="4.2s"
+                      repeatCount="indefinite"
+                      path={
+                        selectedRoutePreview === 'A'
+                          ? 'M 35 95 C 85 75, 125 85, 165 85'
+                          : selectedRoutePreview === 'C'
+                          ? 'M 35 95 C 120 115, 200 80, 280 60 S 360 40, 405 25'
+                          : 'M 35 95 C 115 95, 145 30, 225 30 S 335 80, 405 25'
+                      }
+                    />
                   </circle>
                 </svg>
               </div>

@@ -121,20 +121,19 @@ interface CityFlowContextType {
 const CityFlowContext = createContext<CityFlowContextType | undefined>(undefined);
 
 export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [activePage, setActivePage] = useState<PageName>(() => {
-    try {
-      const saved = localStorage.getItem('cityflow_user');
-      if (saved && JSON.parse(saved)) return 'dashboard';
-    } catch (e) {}
-    return 'login';
-  });
+  const [activePage, setActivePage] = useState<PageName>('landing');
   const [selectedCity, setSelectedCity] = useState<string>('Delhi — Greater Noida Corridor');
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   const [user, setUser] = useState<User | null>(() => {
     try {
-      const saved = localStorage.getItem('cityflow_user');
-      if (saved) return JSON.parse(saved);
+      const isAuth = sessionStorage.getItem('cityflow_authenticated_session');
+      if (isAuth === 'true') {
+        const saved = localStorage.getItem('cityflow_user');
+        if (saved) return JSON.parse(saved);
+      } else {
+        localStorage.removeItem('cityflow_user');
+      }
     } catch (e) {}
     return null;
   });
@@ -545,6 +544,7 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
   const loginAs = (newUser: User) => {
     setUser(newUser);
     try {
+      sessionStorage.setItem('cityflow_authenticated_session', 'true');
       localStorage.setItem('cityflow_user', JSON.stringify(newUser));
     } catch (e) {}
     setActivePage('dashboard');
@@ -553,6 +553,7 @@ export const CityFlowProvider: React.FC<{ children: ReactNode }> = ({ children }
   const logout = () => {
     setUser(null);
     try {
+      sessionStorage.removeItem('cityflow_authenticated_session');
       localStorage.removeItem('cityflow_user');
     } catch (e) {}
     setActivePage('login');

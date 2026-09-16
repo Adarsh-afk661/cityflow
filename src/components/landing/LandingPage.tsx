@@ -8,11 +8,16 @@ interface LandingPageProps {
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) => {
-  const { setLoginModalOpen } = useCityFlow();
+  const { user, setActivePage } = useCityFlow();
   const [demoOpen, setDemoOpen] = useState(false);
   const [selectedRoutePreview, setSelectedRoutePreview] = useState<'A' | 'B' | 'C'>('B');
 
   const handleLaunchPlatform = (targetPage: PageName = 'dashboard') => {
+    if (!user) {
+      // Pahle login ka bole fir aage badhe!
+      setActivePage('login');
+      return;
+    }
     onNavigatePlatform(targetPage);
   };
 
@@ -28,9 +33,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigatePlatform }) 
             <span style={{ fontSize: '10px', background: '#ecfdf5', color: '#166534', padding: '1px 6px', borderRadius: '4px', border: '1px solid #bbf7d0', fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>PRO</span>
           </div>
           <div className="nav-links">
-            <button onClick={() => handleLaunchPlatform('routeshield')}>Platform</button>
+            <button onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Platform</button>
             <button onClick={() => handleLaunchPlatform('routeshield')}>RouteShield</button>
-            <button onClick={() => handleLaunchPlatform('analytics')}>Results</button>
+            <button onClick={() => document.getElementById('stats')?.scrollIntoView({ behavior: 'smooth' })}>Results</button>
             <button onClick={() => handleLaunchPlatform('fleet')}>Fleet Ops</button>
           </div>
           <div className="nav-cta">

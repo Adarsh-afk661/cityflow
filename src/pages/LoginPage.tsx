@@ -423,6 +423,17 @@ export const LoginPage: React.FC = () => {
               {/* Green Brand Accent Line */}
               <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-emerald-600 via-[#166534] to-teal-700" />
 
+              {/* Operator Access Gate Notice */}
+              <div className="mb-4 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center space-x-2.5 font-medium shadow-xs">
+                <div className="w-5 h-5 rounded-full bg-amber-200 text-amber-900 flex items-center justify-center font-bold text-xs shrink-0">
+                  !
+                </div>
+                <div className="leading-snug">
+                  <span className="font-bold block text-amber-950">Operator Login Required:</span>
+                  <span>RouteShield aur corridor console access karne ke liye pahle login karein.</span>
+                </div>
+              </div>
+
               {/* Mode Tabs */}
               <div className="flex items-center space-x-1 p-1 bg-slate-100 rounded-2xl border border-slate-200 mb-6">
                 <button
